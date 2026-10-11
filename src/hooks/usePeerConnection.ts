@@ -86,8 +86,13 @@ export function usePeerConnection(options: UsePeerConnectionOptions) {
   const startOffer = useCallback(async () => {
     if (!peerServiceRef.current) return;
     const offer = await peerServiceRef.current.createOffer();
-    options.signalingService.sendMessage('OFFER', offer, options.role, options.sessionId);
-  }, [options]);
+    optionsRef.current.signalingService.sendMessage(
+      'OFFER',
+      offer,
+      optionsRef.current.role,
+      optionsRef.current.sessionId
+    );
+  }, []);
 
   const close = useCallback(() => {
     peerServiceRef.current?.close();
