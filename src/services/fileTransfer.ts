@@ -16,6 +16,7 @@ import {
 import { packChunk, unpackPacket } from '../utils/packetProtocol';
 import { computeSHA256 } from '../utils/fileIntegrity';
 import { sanitizeFileName } from '../utils/validation';
+import { createFileSink, FileSink } from '../utils/fileSink';
 
 export type ProgressCallback = (progress: TransferProgress) => void;
 
@@ -301,7 +302,7 @@ export class FileTransferService {
   ): Promise<void> {
     this.isCancelled = false;
     let totalBytesReceived = 0;
-    const fileChunksMap = new Map<number, Uint8Array[]>();
+    const fileSinksMap = new Map<number, FileSink>();
     const fileBytesReceivedMap = new Map<number, number>();
 
     onProgress({
@@ -360,12 +361,12 @@ export class FileTransferService {
         if (!fileMeta) return;
 
         if (unpacked.type === PacketType.FILE_CHUNK) {
-          let chunks = fileChunksMap.get(unpacked.fileIndex);
-          if (!chunks) {
-            chunks = [];
-            fileChunksMap.set(unpacked.fileIndex, chunks);
+          let sink = fileSinksMap.get(unpacked.fileIndex);
+          if (!sink) {
+            sink = await createFileSink(fileMeta.name, fileMeta.type, fileMeta.size);
+            fileSinksMap.set(unpacked.fileIndex, sink);
           }
-          chunks.push(unpacked.payload);
+          await sink.write(unpacked.payload);
 
           const curBytes = (fileBytesReceivedMap.get(unpacked.fileIndex) || 0) + unpacked.payloadLength;
           fileBytesReceivedMap.set(unpacked.fileIndex, curBytes);
@@ -398,10 +399,12 @@ export class FileTransferService {
             });
           }
         } else if (unpacked.type === PacketType.END_FILE) {
-          // File completed, reconstruct blob & verify integrity
-          const chunks = fileChunksMap.get(unpacked.fileIndex) || [];
-          const combinedBlob = new Blob(chunks as unknown as BlobPart[], { type: fileMeta.type || 'application/octet-stream' });
-          fileChunksMap.delete(unpacked.fileIndex); // Free memory
+          // File completed, finalize blob from disk or RAM
+          const sink = fileSinksMap.get(unpacked.fileIndex);
+          const combinedBlob = sink
+            ? await sink.close()
+            : new Blob([], { type: fileMeta.type || 'application/octet-stream' });
+          fileSinksMap.delete(unpacked.fileIndex); // Free memory immediately
 
           onProgress({
             currentFileIndex: unpacked.fileIndex,
