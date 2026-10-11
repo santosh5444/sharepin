@@ -14,6 +14,7 @@ interface UsePeerConnectionOptions {
 export function usePeerConnection(options: UsePeerConnectionOptions) {
   const [connectionState, setConnectionState] = useState<RTCPeerConnectionState>('new');
   const peerServiceRef = useRef<PeerConnectionService | null>(null);
+  const pendingCandidatesRef = useRef<RTCIceCandidateInit[]>([]);
 
   const optionsRef = useRef(options);
   optionsRef.current = options;
@@ -44,6 +45,13 @@ export function usePeerConnection(options: UsePeerConnectionOptions) {
     peerServiceRef.current = pc;
     pc.initialize(isInitiator);
 
+    while (pendingCandidatesRef.current.length > 0) {
+      const c = pendingCandidatesRef.current.shift();
+      if (c) {
+        pc.addIceCandidate(c);
+      }
+    }
+
     return pc;
   }, []);
 
@@ -64,7 +72,10 @@ export function usePeerConnection(options: UsePeerConnectionOptions) {
   }, []);
 
   const handleIceCandidate = useCallback(async (candidate: RTCIceCandidateInit) => {
-    if (!peerServiceRef.current) return;
+    if (!peerServiceRef.current) {
+      pendingCandidatesRef.current.push(candidate);
+      return;
+    }
     await peerServiceRef.current.addIceCandidate(candidate);
   }, []);
 

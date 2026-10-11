@@ -110,6 +110,7 @@ export const App: React.FC = () => {
             if (peerRole === 'receiver') {
               setIncomingManifest(msg.payload.manifest);
               setSessionState('RECEIVER_JOINED');
+              initConnection();
             }
             break;
 

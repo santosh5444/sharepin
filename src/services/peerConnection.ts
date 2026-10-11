@@ -11,9 +11,27 @@ export interface PeerConnectionConfig {
   onError: (error: Error) => void;
 }
 
-const DEFAULT_STUN_SERVERS = [
-  'stun:stun.l.google.com:19302',
-  'stun:stun1.l.google.com:19302',
+const DEFAULT_ICE_SERVERS: RTCIceServer[] = [
+  {
+    urls: [
+      'stun:stun.l.google.com:19302',
+      'stun:stun1.l.google.com:19302',
+      'stun:stun2.l.google.com:19302',
+      'stun:stun3.l.google.com:19302',
+      'stun:stun4.l.google.com:19302',
+      'stun:stun.cloudflare.com:3478',
+      'stun:openrelay.metered.ca:80',
+    ],
+  },
+  {
+    urls: [
+      'turn:openrelay.metered.ca:80',
+      'turn:openrelay.metered.ca:443',
+      'turn:openrelay.metered.ca:443?transport=tcp',
+    ],
+    username: 'openrelayproject',
+    credential: 'openrelayproject',
+  },
 ];
 
 export class PeerConnectionService {
@@ -30,12 +48,9 @@ export class PeerConnectionService {
       this.close();
     }
 
-    const stunUrls = this.config.stunServers || DEFAULT_STUN_SERVERS;
-    const iceServers: RTCIceServer[] = [
-      {
-        urls: stunUrls,
-      },
-    ];
+    const iceServers = this.config.stunServers && this.config.stunServers.length > 0
+      ? [{ urls: this.config.stunServers }, ...DEFAULT_ICE_SERVERS.slice(1)]
+      : DEFAULT_ICE_SERVERS;
 
     this.pc = new RTCPeerConnection({
       iceServers,
@@ -51,6 +66,16 @@ export class PeerConnectionService {
     this.pc.onconnectionstatechange = () => {
       if (this.pc) {
         this.config.onConnectionStateChange(this.pc.connectionState);
+      }
+    };
+
+    this.pc.oniceconnectionstatechange = () => {
+      if (this.pc) {
+        if (this.pc.iceConnectionState === 'connected' || this.pc.iceConnectionState === 'completed') {
+          this.config.onConnectionStateChange('connected');
+        } else if (this.pc.iceConnectionState === 'failed') {
+          this.config.onConnectionStateChange('failed');
+        }
       }
     };
 
@@ -72,6 +97,10 @@ export class PeerConnectionService {
   private setupDataChannel(channel: RTCDataChannel): void {
     channel.binaryType = 'arraybuffer';
 
+    if (channel.readyState === 'open') {
+      this.config.onDataChannelOpened(channel);
+    }
+
     channel.onopen = () => {
       this.config.onDataChannelOpened(channel);
     };
@@ -88,7 +117,10 @@ export class PeerConnectionService {
     if (!this.pc) throw new Error('RTCPeerConnection is not initialized');
     const offer = await this.pc.createOffer();
     await this.pc.setLocalDescription(offer);
-    return offer;
+    return {
+      type: offer.type,
+      sdp: offer.sdp,
+    };
   }
 
   public async handleOfferAndCreateAnswer(
@@ -99,7 +131,10 @@ export class PeerConnectionService {
     await this.flushQueuedCandidates();
     const answer = await this.pc.createAnswer();
     await this.pc.setLocalDescription(answer);
-    return answer;
+    return {
+      type: answer.type,
+      sdp: answer.sdp,
+    };
   }
 
   public async handleAnswer(answer: RTCSessionDescriptionInit): Promise<void> {
