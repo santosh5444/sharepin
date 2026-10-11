@@ -37,34 +37,37 @@ export class FileTransferService {
    * Waits for data channel bufferedAmount to drain below threshold
    */
   private async waitForBufferDrain(): Promise<void> {
-    const buffered = this.transport.bufferedAmount || 0;
-    if (buffered <= BUFFERED_AMOUNT_LOW_THRESHOLD) {
+    if ((this.transport.bufferedAmount || 0) <= BUFFERED_AMOUNT_LOW_THRESHOLD) {
       return;
     }
 
-    if ('bufferedamountlow' in this.transport || 'onbufferedamountlow' in this.transport) {
-      return new Promise((resolve, reject) => {
-        const handleLow = () => {
-          this.transport.removeEventListener('bufferedamountlow', handleLow);
-          this.transport.removeEventListener('close', handleClose);
-          resolve();
-        };
+    return new Promise((resolve) => {
+      let timer: any = null;
 
-        const handleClose = () => {
-          this.transport.removeEventListener('bufferedamountlow', handleLow);
-          this.transport.removeEventListener('close', handleClose);
-          reject(new Error('Channel closed while waiting for buffer drain'));
-        };
+      const handleLow = () => {
+        cleanup();
+        resolve();
+      };
 
+      const cleanup = () => {
+        if (timer) clearInterval(timer);
+        try {
+          this.transport.removeEventListener('bufferedamountlow', handleLow);
+        } catch {}
+      };
+
+      try {
         this.transport.addEventListener('bufferedamountlow', handleLow);
-        this.transport.addEventListener('close', handleClose);
-      });
-    }
+      } catch {}
 
-    // Polling fallback for WebSocket bufferedAmount
-    while ((this.transport.bufferedAmount || 0) > BUFFERED_AMOUNT_LOW_THRESHOLD) {
-      await new Promise(r => setTimeout(r, 20));
-    }
+      // Fast 10ms polling watchdog guarantees zero stalling or missed event deadlocks
+      timer = setInterval(() => {
+        if ((this.transport.bufferedAmount || 0) <= BUFFERED_AMOUNT_LOW_THRESHOLD) {
+          cleanup();
+          resolve();
+        }
+      }, 10);
+    });
   }
 
   /**
