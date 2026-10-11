@@ -19,7 +19,7 @@
   "migrations": [
     {
       "tag": "v1",
-      "new_classes": ["PinRegistryDO", "SessionDO"]
+      "new_sqlite_classes": ["PinRegistryDO", "SessionDO"]
     }
   ],
   "observability": {
