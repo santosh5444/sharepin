@@ -3,6 +3,8 @@ import { PeerRole, SignalingPacket } from './types';
 export class SessionDO {
   private senderWs: WebSocket | null = null;
   private receiverWs: WebSocket | null = null;
+  private pendingForReceiver: SignalingPacket[] = [];
+  private pendingForSender: SignalingPacket[] = [];
 
   constructor(_state: DurableObjectState, _env: any) {}
 
@@ -18,8 +20,9 @@ export class SessionDO {
       return new Response('Invalid role parameter', { status: 400 });
     }
 
-    const webSocketPair = new WebSocketPair();
-    const [client, server] = Object.values(webSocketPair);
+    const pair = new WebSocketPair();
+    const client = (pair as any)[0] || (pair as any).client;
+    const server = (pair as any)[1] || (pair as any).server;
 
     server.accept();
 
@@ -28,11 +31,19 @@ export class SessionDO {
         try { this.senderWs.close(1000, 'Replaced by new sender connection'); } catch {}
       }
       this.senderWs = server;
+      while (this.pendingForSender.length > 0) {
+        const p = this.pendingForSender.shift()!;
+        try { server.send(JSON.stringify(p)); } catch {}
+      }
     } else {
       if (this.receiverWs) {
         try { this.receiverWs.close(1000, 'Replaced by new receiver connection'); } catch {}
       }
       this.receiverWs = server;
+      while (this.pendingForReceiver.length > 0) {
+        const p = this.pendingForReceiver.shift()!;
+        try { server.send(JSON.stringify(p)); } catch {}
+      }
     }
 
     // When both peers are connected, inform them so WebRTC negotiation can commence
@@ -49,7 +60,7 @@ export class SessionDO {
       });
     }
 
-    server.addEventListener('message', (event) => {
+    server.addEventListener('message', (event: MessageEvent) => {
       try {
         const data = typeof event.data === 'string' ? JSON.parse(event.data) : null;
         if (!data || !data.type) return;
@@ -98,12 +109,19 @@ export class SessionDO {
 
   private sendToPeer(targetRole: PeerRole, packet: SignalingPacket): void {
     const targetWs = targetRole === 'sender' ? this.senderWs : this.receiverWs;
-    if (targetWs && targetWs.readyState === WebSocket.READY_STATE_OPEN) {
+    if (targetWs) {
       try {
         targetWs.send(JSON.stringify(packet));
+        return;
       } catch (err) {
         console.warn('Failed to send to peer socket:', err);
       }
+    }
+
+    if (targetRole === 'sender') {
+      this.pendingForSender.push(packet);
+    } else {
+      this.pendingForReceiver.push(packet);
     }
   }
 }

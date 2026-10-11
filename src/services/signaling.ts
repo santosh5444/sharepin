@@ -57,7 +57,11 @@ export class SignalingService {
       });
 
       if (res.ok) {
-        return await res.json();
+        const raw = (await res.json()) as any;
+        return {
+          ...raw,
+          token: raw.token || raw.senderToken || '',
+        };
       }
 
       // If server returned 404/500/502 (e.g. proxying to offline worker in local dev), fallback
@@ -83,7 +87,11 @@ export class SignalingService {
       });
 
       if (res.ok) {
-        return await res.json();
+        const raw = (await res.json()) as any;
+        return {
+          ...raw,
+          token: raw.token || raw.receiverToken || '',
+        };
       }
 
       // Check if local dev session exists

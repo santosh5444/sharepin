@@ -61,6 +61,7 @@ export class PinRegistryDO {
     success: boolean;
     sessionId?: string;
     pin?: string;
+    token?: string;
     senderToken?: string;
     expiresAt?: number;
     error?: string;
@@ -93,6 +94,7 @@ export class PinRegistryDO {
       success: true,
       sessionId,
       pin,
+      token: senderToken,
       senderToken,
       expiresAt,
     };
@@ -105,6 +107,7 @@ export class PinRegistryDO {
   public joinSession(pin: string): {
     success: boolean;
     sessionId?: string;
+    token?: string;
     receiverToken?: string;
     expiresAt?: number;
     errorCode?: 'INVALID_PIN' | 'EXPIRED_PIN' | 'ALREADY_PAIRED';
@@ -148,6 +151,7 @@ export class PinRegistryDO {
     return {
       success: true,
       sessionId: record.sessionId,
+      token: record.receiverToken,
       receiverToken: record.receiverToken,
       expiresAt: record.expiresAt,
     };
