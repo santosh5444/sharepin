@@ -400,12 +400,25 @@ export const App: React.FC = () => {
       </main>
 
       <footer className="w-full border-t border-slate-200/80 py-6 text-center text-xs text-slate-500">
-        <div className="max-w-5xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between space-y-2 sm:space-y-0">
-          <div>
-            <strong>SharePin</strong> • Pure Peer-to-Peer File Transfer
+        <div className="max-w-5xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3">
+          <div className="flex items-center space-x-2">
+            <strong className="text-slate-800">SharePin</strong>
+            <span className="text-slate-300">•</span>
+            <span>Pure Peer-to-Peer File Transfer</span>
           </div>
+
+          {/* Crafted with love credit */}
+          <div className="inline-flex items-center space-x-1.5 px-3.5 py-1.5 rounded-full bg-slate-100/90 border border-slate-200/80 shadow-sm text-xs text-slate-600 transition hover:border-brand-200">
+            <span>Made with</span>
+            <span className="text-rose-500 text-sm animate-pulse inline-block select-none leading-none">❤️</span>
+            <span>by</span>
+            <span className="font-extrabold tracking-wide bg-gradient-to-r from-brand-600 via-indigo-600 to-purple-600 bg-clip-text text-transparent">
+              Santosh
+            </span>
+          </div>
+
           <div className="text-slate-400">
-            Encrypted WebRTC • No permanent storage • Temporary 3-min PIN
+            Encrypted WebRTC • Zero Storage • Ephemeral P2P
           </div>
         </div>
       </footer>
