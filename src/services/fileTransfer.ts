@@ -15,8 +15,9 @@ import {
 } from '../types/transfer';
 import { packChunk, unpackPacket } from '../utils/packetProtocol';
 import { computeSHA256 } from '../utils/fileIntegrity';
-import { sanitizeFileName } from '../utils/validation';
 import { createFileSink, FileSink } from '../utils/fileSink';
+import { compressChunk, decompressChunk } from '../utils/streamCompression';
+import { sanitizeFileName } from '../utils/validation';
 
 export type ProgressCallback = (progress: TransferProgress) => void;
 
@@ -211,12 +212,16 @@ export class FileTransferService {
         }
 
         const payload = new Uint8Array(chunkBuffer);
+        const compressed = await compressChunk(payload);
+        const finalPayload = compressed || payload;
+        const flags = compressed ? 0x01 : 0x00;
 
         const packet = packChunk(
           PacketType.FILE_CHUNK,
           fileIndex,
           chunkIndex,
-          payload
+          finalPayload,
+          flags
         );
 
         // Check backpressure before queueing
@@ -369,11 +374,16 @@ export class FileTransferService {
             sink = await createFileSink(fileMeta.name, fileMeta.type, fileMeta.size);
             fileSinksMap.set(unpacked.fileIndex, sink);
           }
-          await sink.write(unpacked.payload);
 
-          const curBytes = (fileBytesReceivedMap.get(unpacked.fileIndex) || 0) + unpacked.payloadLength;
+          const chunkData = (unpacked.flags & 0x01)
+            ? await decompressChunk(unpacked.payload)
+            : unpacked.payload;
+
+          await sink.write(chunkData);
+
+          const curBytes = (fileBytesReceivedMap.get(unpacked.fileIndex) || 0) + chunkData.byteLength;
           fileBytesReceivedMap.set(unpacked.fileIndex, curBytes);
-          totalBytesReceived += unpacked.payloadLength;
+          totalBytesReceived += chunkData.byteLength;
 
           // Metrics update
           const now = Date.now();

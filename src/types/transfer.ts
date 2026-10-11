@@ -78,6 +78,6 @@ export const HEADER_SIZE = 20;
 // Turbo 256 KiB chunk size: maximum throughput for modern WebRTC DataChannels & WebSocket relays
 export const DEFAULT_CHUNK_SIZE = 256 * 1024; // 256 KiB
 
-// High-throughput streaming buffer thresholds
-export const BUFFERED_AMOUNT_LOW_THRESHOLD = 1024 * 1024; // 1 MiB
-export const BUFFERED_AMOUNT_HIGH_WATERMARK = 4 * 1024 * 1024; // 4 MiB
+// High-throughput streaming buffer thresholds (8 MiB flight window for maximum 5G TCP pipe saturation)
+export const BUFFERED_AMOUNT_LOW_THRESHOLD = 2 * 1024 * 1024; // 2 MiB
+export const BUFFERED_AMOUNT_HIGH_WATERMARK = 8 * 1024 * 1024; // 8 MiB

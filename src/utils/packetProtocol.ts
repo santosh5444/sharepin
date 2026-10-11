@@ -2,6 +2,7 @@ import { PACKET_MAGIC, PacketType, HEADER_SIZE } from '../types/transfer';
 
 export interface UnpackedPacket {
   type: PacketType;
+  flags: number;
   fileIndex: number;
   chunkIndex: number;
   payloadLength: number;
@@ -15,7 +16,8 @@ export function packChunk(
   type: PacketType,
   fileIndex: number,
   chunkIndex: number,
-  payload: Uint8Array
+  payload: Uint8Array,
+  flags = 0
 ): Uint8Array {
   const packet = new Uint8Array(HEADER_SIZE + payload.byteLength);
   const view = new DataView(packet.buffer, packet.byteOffset, packet.byteLength);
@@ -26,8 +28,8 @@ export function packChunk(
   // [4] Packet Type
   view.setUint8(4, type);
 
-  // [5] Flags (0 for now)
-  view.setUint8(5, 0);
+  // [5] Flags (0x01 = Compressed with Deflate)
+  view.setUint8(5, flags);
 
   // [6..7] Reserved (0)
   view.setUint16(6, 0, false);
@@ -65,7 +67,7 @@ export function unpackPacket(buffer: ArrayBuffer | Uint8Array): UnpackedPacket |
   }
 
   const type = view.getUint8(4) as PacketType;
-  // bytes 5, 6, 7 are flags & reserved
+  const flags = view.getUint8(5);
   const fileIndex = view.getUint32(8, false);
   const chunkIndex = view.getUint32(12, false);
   const payloadLength = view.getUint32(16, false);
@@ -78,6 +80,7 @@ export function unpackPacket(buffer: ArrayBuffer | Uint8Array): UnpackedPacket |
 
   return {
     type,
+    flags,
     fileIndex,
     chunkIndex,
     payloadLength,
