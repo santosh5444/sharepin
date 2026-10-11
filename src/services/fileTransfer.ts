@@ -190,13 +190,22 @@ export class FileTransferService {
       const totalChunks = Math.ceil(file.size / DEFAULT_CHUNK_SIZE) || 1;
       let fileBytesTransferred = 0;
 
+      // Pipeline: pre-read first chunk
+      let nextChunkPromise: Promise<ArrayBuffer> | null =
+        totalChunks > 0 ? file.slice(0, Math.min(DEFAULT_CHUNK_SIZE, file.size)).arrayBuffer() : null;
+
       for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
         if (this.isCancelled) throw new Error('Transfer cancelled by user');
 
-        const start = chunkIndex * DEFAULT_CHUNK_SIZE;
-        const end = Math.min(start + DEFAULT_CHUNK_SIZE, file.size);
-        const slice = file.slice(start, end);
-        const chunkBuffer = await slice.arrayBuffer();
+        const chunkBuffer = await nextChunkPromise!;
+
+        // Pipeline / prefetch next chunk concurrently while sending this chunk
+        if (chunkIndex + 1 < totalChunks) {
+          const nextStart = (chunkIndex + 1) * DEFAULT_CHUNK_SIZE;
+          const nextEnd = Math.min(nextStart + DEFAULT_CHUNK_SIZE, file.size);
+          nextChunkPromise = file.slice(nextStart, nextEnd).arrayBuffer();
+        }
+
         const payload = new Uint8Array(chunkBuffer);
 
         const packet = packChunk(
