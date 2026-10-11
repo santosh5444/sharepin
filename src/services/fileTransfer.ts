@@ -67,6 +67,92 @@ export class FileTransferService {
   }
 
   /**
+   * SENDER: Probes transport with HANDSHAKE_PROBE packets until recipient responds with HANDSHAKE_ACK.
+   * Confirms bidirectional connectivity and that recipient message listener is active.
+   */
+  private async performHandshake(timeoutMs: number = 2000): Promise<void> {
+    const probe = packChunk(PacketType.HANDSHAKE_PROBE, 0, 0, new Uint8Array(0));
+
+    return new Promise((resolve, reject) => {
+      let isDone = false;
+      let intervalId: any = null;
+      let timeoutId: any = null;
+
+      const handleAck = async (event: Event) => {
+        const msgEvent = event as MessageEvent;
+        let rawData = msgEvent.data;
+        if (typeof rawData === 'string') return;
+        if (typeof Blob !== 'undefined' && rawData instanceof Blob) {
+          rawData = await rawData.arrayBuffer();
+        }
+        const unpacked = unpackPacket(rawData);
+        if (unpacked && unpacked.type === PacketType.HANDSHAKE_ACK) {
+          isDone = true;
+          cleanup();
+          resolve();
+        }
+      };
+
+      const cleanup = () => {
+        if (intervalId) clearInterval(intervalId);
+        if (timeoutId) clearTimeout(timeoutId);
+        this.transport.removeEventListener('message', handleAck);
+      };
+
+      this.transport.addEventListener('message', handleAck);
+
+      // Probe immediately
+      try {
+        this.transport.send(probe.buffer as ArrayBuffer);
+      } catch {}
+
+      // Retry probe every 200ms in case receiver was still rendering or connecting
+      intervalId = setInterval(() => {
+        if (isDone || this.isCancelled) return;
+        try {
+          this.transport.send(probe.buffer as ArrayBuffer);
+        } catch {}
+      }, 200);
+
+      timeoutId = setTimeout(() => {
+        cleanup();
+        reject(new Error('Recipient transport handshake timeout'));
+      }, timeoutMs);
+    });
+  }
+
+  /**
+   * SENDER: Waits for recipient to confirm all files have been received and verified.
+   */
+  private async waitForCompletionAck(timeoutMs: number = 10000): Promise<void> {
+    return new Promise((resolve) => {
+      let timeoutId: any = null;
+
+      const handleComplete = async (event: Event) => {
+        const msgEvent = event as MessageEvent;
+        let rawData = msgEvent.data;
+        if (typeof rawData === 'string') return;
+        if (typeof Blob !== 'undefined' && rawData instanceof Blob) {
+          rawData = await rawData.arrayBuffer();
+        }
+        const unpacked = unpackPacket(rawData);
+        if (unpacked && unpacked.type === PacketType.TRANSFER_COMPLETE) {
+          if (timeoutId) clearTimeout(timeoutId);
+          this.transport.removeEventListener('message', handleComplete);
+          resolve();
+        }
+      };
+
+      this.transport.addEventListener('message', handleComplete);
+
+      timeoutId = setTimeout(() => {
+        this.transport.removeEventListener('message', handleComplete);
+        resolve(); // Graceful resolve after timeout
+      }, timeoutMs);
+    });
+  }
+
+  /**
    * SENDER: Streams files sequentially using slice() and backpressure
    */
   public async sendFiles(
@@ -80,6 +166,22 @@ export class FileTransferService {
     let lastMetricsTime = startTime;
     let lastBytesSample = 0;
     let currentSpeedBps = 0;
+
+    onProgress({
+      currentFileIndex: 0,
+      currentFileName: files[0]?.name || 'Files',
+      currentFileBytesTransferred: 0,
+      currentFileSize: files[0]?.size || 0,
+      totalFiles: files.length,
+      totalBytesTransferred: 0,
+      totalBytes,
+      speedBps: 0,
+      etaSeconds: null,
+      status: 'TRANSFERRING',
+    });
+
+    // Verify recipient transport is active before streaming chunks
+    await this.performHandshake(2000);
 
     for (let fileIndex = 0; fileIndex < files.length; fileIndex++) {
       if (this.isCancelled) throw new Error('Transfer cancelled by user');
@@ -158,6 +260,22 @@ export class FileTransferService {
       totalFiles: files.length,
       totalBytesTransferred: totalBytes,
       totalBytes,
+      speedBps: currentSpeedBps,
+      etaSeconds: 0,
+      status: 'VERIFYING_INTEGRITY',
+    });
+
+    // Wait for recipient to acknowledge full receipt & verification
+    await this.waitForCompletionAck(10000);
+
+    onProgress({
+      currentFileIndex: files.length - 1,
+      currentFileName: files[files.length - 1]?.name || '',
+      currentFileBytesTransferred: files[files.length - 1]?.size || 0,
+      currentFileSize: files[files.length - 1]?.size || 0,
+      totalFiles: files.length,
+      totalBytesTransferred: totalBytes,
+      totalBytes,
       speedBps: 0,
       etaSeconds: 0,
       status: 'COMPLETED',
@@ -203,8 +321,25 @@ export class FileTransferService {
           return;
         }
 
-        const unpacked = unpackPacket(msgEvent.data);
+        let rawData = msgEvent.data;
+        if (typeof rawData === 'string') {
+          return; // Ignore signaling frames if transport is WebSocket
+        }
+        if (typeof Blob !== 'undefined' && rawData instanceof Blob) {
+          rawData = await rawData.arrayBuffer();
+        }
+
+        const unpacked = unpackPacket(rawData);
         if (!unpacked) return;
+
+        if (unpacked.type === PacketType.HANDSHAKE_PROBE) {
+          // Immediately acknowledge probe to unblock sender streaming
+          const ack = packChunk(PacketType.HANDSHAKE_ACK, 0, 0, new Uint8Array(0));
+          try {
+            this.transport.send(ack.buffer as ArrayBuffer);
+          } catch {}
+          return;
+        }
 
         if (unpacked.type === PacketType.CANCEL) {
           this.transport.removeEventListener('message', handleMessage);
@@ -288,6 +423,12 @@ export class FileTransferService {
 
           // Check if all files in manifest are done
           if (unpacked.fileIndex === manifest.totalFiles - 1) {
+            // Signal sender that recipient completed download & integrity verification
+            const completePacket = packChunk(PacketType.TRANSFER_COMPLETE, unpacked.fileIndex, 0, new Uint8Array(0));
+            try {
+              this.transport.send(completePacket.buffer as ArrayBuffer);
+            } catch {}
+
             this.transport.removeEventListener('message', handleMessage);
             onProgress({
               currentFileIndex: unpacked.fileIndex,

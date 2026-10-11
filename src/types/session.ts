@@ -40,6 +40,8 @@ export type SignalingMessageType =
   | 'SESSION_EXPIRED'
   | 'PEER_CONNECTED'
   | 'PEER_DISCONNECTED'
+  | 'RECIPIENT_READY'
+  | 'FALLBACK_TO_RELAY'
   | 'HEARTBEAT'
   | 'HEARTBEAT_ACK';
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Header } from './components/Header';
 import { Home } from './pages/Home';
 import { Send } from './pages/Send';
@@ -69,6 +69,9 @@ export const App: React.FC = () => {
     cancel: cancelTransfer,
   } = useFileTransfer(activeTransport);
 
+  const isSendingRef = useRef(false);
+  const isReceivingRef = useRef(false);
+
   const resetAll = () => {
     resetSession();
     closePeerConnection();
@@ -76,6 +79,8 @@ export const App: React.FC = () => {
     setIncomingManifest(null);
     setSelectedFiles([]);
     setReceiverAccepted(false);
+    isSendingRef.current = false;
+    isReceivingRef.current = false;
   };
 
   const handleNavigateHome = () => {
@@ -86,9 +91,16 @@ export const App: React.FC = () => {
   // Setup WebSocket Signaling listener
   const connectSignaling = (sId: string, tok: string, peerRole: 'sender' | 'receiver') => {
     signalingService.connectWebSocket(sId, tok, peerRole, {
+      onOpen: () => {
+        if (peerRole === 'receiver') {
+          // Notify sender receiver has connected in case of race
+          signalingService.sendMessage('RECIPIENT_READY', null, 'receiver', sId);
+        }
+      },
       onMessage: async (msg) => {
         switch (msg.type) {
           case 'PEER_CONNECTED':
+          case 'RECIPIENT_READY' as any:
             if (peerRole === 'sender') {
               setSessionState('RECEIVER_JOINED');
             } else {
@@ -128,6 +140,11 @@ export const App: React.FC = () => {
             }
             break;
 
+          case 'FALLBACK_TO_RELAY':
+            console.log('Peer requested Cloudflare Edge Relay fallback');
+            fallbackToRelayTransport();
+            break;
+
           case 'SENDER_REJECTED':
             setSessionState('CANCELLED');
             setErrorMessage('Transfer was declined by the sender.');
@@ -151,6 +168,16 @@ export const App: React.FC = () => {
       },
     });
   };
+
+  const fallbackToRelayTransport = useCallback(() => {
+    const ws = signalingService.getWebSocketTransport();
+    if (ws) {
+      console.log('Engaging instant Cloudflare Edge WebSocket Relay transport');
+      isSendingRef.current = false;
+      isReceivingRef.current = false;
+      setActiveTransport(ws);
+    }
+  }, [signalingService]);
 
   // 1. SENDER: Create session
   const handleCreateSession = async (files: File[]) => {
@@ -212,24 +239,22 @@ export const App: React.FC = () => {
     signalingService.sendMessage('SENDER_APPROVED', null, 'receiver', sessionId);
   };
 
-  // NAT Traversal / 5G Fallback timer:
-  // If receiver accepted transfer but WebRTC DataChannel hasn't opened within 1.5 seconds,
-  // automatically fall back to the live Cloudflare WebSocket relay.
+  // Synchronized NAT Traversal / 5G Fallback timer:
+  // If receiver accepted transfer but WebRTC DataChannel hasn't opened within 2.0 seconds,
+  // automatically signal peer and switch both to the Cloudflare edge WebSocket relay.
   useEffect(() => {
-    if (receiverAccepted && !activeTransport) {
+    if (receiverAccepted && (!activeTransport || (activeTransport instanceof RTCDataChannel && activeTransport.readyState !== 'open'))) {
       const timer = setTimeout(() => {
         const ws = signalingService.getWebSocketTransport();
-        if (ws) {
-          console.log('Direct P2P DataChannel timeout (5G/Symmetric NAT). Engaging instant Cloudflare edge relay.');
-          setActiveTransport(ws);
+        if (ws && (activeTransport as any) !== ws) {
+          console.log('WebRTC connection setup exceeded 2s (strict 5G/Symmetric NAT). Engaging Cloudflare Edge Relay.');
+          signalingService.sendMessage('FALLBACK_TO_RELAY', null, role, sessionId);
+          fallbackToRelayTransport();
         }
-      }, 1500);
+      }, 2000);
       return () => clearTimeout(timer);
     }
-  }, [receiverAccepted, activeTransport, signalingService]);
-
-  const isSendingRef = useRef(false);
-  const isReceivingRef = useRef(false);
+  }, [receiverAccepted, activeTransport, signalingService, role, sessionId, fallbackToRelayTransport]);
 
   // 6. SENDER: Start file stream when transport is open AND receiver accepted
   useEffect(() => {
@@ -247,11 +272,18 @@ export const App: React.FC = () => {
           setSessionState('COMPLETED');
         })
         .catch((err) => {
-          setSessionState('FAILED');
-          setErrorMessage(err.message || 'Transfer error');
+          const ws = signalingService.getWebSocketTransport();
+          if (activeTransport !== ws && ws) {
+            console.warn('WebRTC transfer attempt failed. Falling back to Cloudflare relay:', err.message);
+            signalingService.sendMessage('FALLBACK_TO_RELAY', null, 'sender', sessionId);
+            fallbackToRelayTransport();
+          } else {
+            setSessionState('FAILED');
+            setErrorMessage(err.message || 'Transfer error');
+          }
         });
     }
-  }, [role, activeTransport, receiverAccepted, selectedFiles, startSending, setSessionState, setErrorMessage]);
+  }, [role, activeTransport, receiverAccepted, selectedFiles, startSending, setSessionState, setErrorMessage, signalingService, sessionId, fallbackToRelayTransport]);
 
   // 7. RECEIVER: Start receiving files when transport is open AND accepted
   useEffect(() => {
@@ -269,11 +301,18 @@ export const App: React.FC = () => {
           setSessionState('COMPLETED');
         })
         .catch((err) => {
-          setSessionState('FAILED');
-          setErrorMessage(err.message || 'Transfer failed');
+          const ws = signalingService.getWebSocketTransport();
+          if (activeTransport !== ws && ws) {
+            console.warn('WebRTC receive failed. Falling back to Cloudflare relay:', err.message);
+            signalingService.sendMessage('FALLBACK_TO_RELAY', null, 'receiver', sessionId);
+            fallbackToRelayTransport();
+          } else {
+            setSessionState('FAILED');
+            setErrorMessage(err.message || 'Transfer failed');
+          }
         });
     }
-  }, [role, activeTransport, receiverAccepted, incomingManifest, startReceiving, setSessionState, setErrorMessage]);
+  }, [role, activeTransport, receiverAccepted, incomingManifest, startReceiving, setSessionState, setErrorMessage, signalingService, sessionId, fallbackToRelayTransport]);
 
   // Audio Chime on Completion
   useEffect(() => {

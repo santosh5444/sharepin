@@ -68,6 +68,9 @@ export enum PacketType {
   CHUNK_ACK = 0x02,
   CANCEL = 0x03,
   END_FILE = 0x04,
+  HANDSHAKE_PROBE = 0x05,
+  HANDSHAKE_ACK = 0x06,
+  TRANSFER_COMPLETE = 0x07,
 }
 
 export const HEADER_SIZE = 20;

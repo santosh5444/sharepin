@@ -259,12 +259,22 @@ export const Send: React.FC<SendProps> = ({
       {/* Step 4: Transferring or Connected */}
       {(sessionState === 'CONNECTING' || sessionState === 'CONNECTED' || sessionState === 'TRANSFERRING') && (
         <div className="space-y-6">
-          {transferProgress && (
+          {transferProgress ? (
             <TransferProgress
               progress={transferProgress}
               onCancel={onCancelTransfer}
               role="sender"
             />
+          ) : (
+            <div className="bg-white border-2 border-brand-500 rounded-3xl p-8 text-center shadow-md">
+              <div className="w-14 h-14 rounded-2xl bg-brand-50 text-brand-600 flex items-center justify-center mx-auto mb-4 animate-pulse">
+                <Clock className="w-7 h-7 animate-spin" />
+              </div>
+              <h3 className="text-xl font-bold text-slate-900 mb-2">Connecting & Preparing Transfer...</h3>
+              <p className="text-sm text-slate-500 max-w-sm mx-auto">
+                Waiting for recipient to click "Accept & Download". The transfer will start immediately.
+              </p>
+            </div>
           )}
         </div>
       )}

@@ -57,6 +57,9 @@ export class PeerConnectionService {
     this.pc.onconnectionstatechange = () => {
       if (this.pc) {
         this.config.onConnectionStateChange(this.pc.connectionState);
+        if (this.pc.connectionState === 'failed') {
+          this.config.onError(new Error('WebRTC connection failed (NAT traversal blocked)'));
+        }
       }
     };
 
@@ -66,6 +69,7 @@ export class PeerConnectionService {
           this.config.onConnectionStateChange('connected');
         } else if (this.pc.iceConnectionState === 'failed') {
           this.config.onConnectionStateChange('failed');
+          this.config.onError(new Error('WebRTC ICE failed (NAT traversal blocked)'));
         }
       }
     };

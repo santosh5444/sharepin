@@ -127,8 +127,16 @@ export class SignalingService {
     try {
       const wsUrl = `${this.wsBaseUrl}/ws?sessionId=${encodeURIComponent(sessionId)}&token=${encodeURIComponent(token)}&role=${role}`;
       this.ws = new WebSocket(wsUrl);
+      this.ws.binaryType = 'arraybuffer';
 
       this.ws.onopen = () => {
+        // Flush any messages queued before open event
+        while (this.outgoingQueue.length > 0) {
+          const item = this.outgoingQueue.shift();
+          if (item) {
+            try { this.ws?.send(item); } catch {}
+          }
+        }
         callbacks.onOpen?.();
       };
 
@@ -158,6 +166,8 @@ export class SignalingService {
     }
   }
 
+  private outgoingQueue: string[] = [];
+
   public sendMessage(type: SignalingMessage['type'], payload?: any, role: PeerRole = 'sender', sessionId: string = ''): void {
     const packet: SignalingMessage = {
       type,
@@ -172,8 +182,12 @@ export class SignalingService {
       return;
     }
 
+    const jsonStr = JSON.stringify(packet);
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      this.ws.send(JSON.stringify(packet));
+      this.ws.send(jsonStr);
+    } else if (this.ws && this.ws.readyState === WebSocket.CONNECTING) {
+      // Queue until open
+      this.outgoingQueue.push(jsonStr);
     }
   }
 

@@ -9,6 +9,7 @@ import { CompletedFileItem } from '../hooks/useFileTransfer';
 import { formatBytes } from '../utils/formatBytes';
 import { downloadFilesAsZip } from '../utils/zipArchive';
 import { FilePreviewModal, PreviewableFile } from '../components/FilePreviewModal';
+import { FileTransferService } from '../services/fileTransfer';
 import {
   Download,
   Check,
@@ -299,7 +300,16 @@ export const Receive: React.FC<ReceiveProps> = ({
                       </div>
                     </div>
 
-                    <div className="flex items-center space-x-2">
+                    <div className="flex items-center space-x-1.5">
+                      <button
+                        type="button"
+                        onClick={() => FileTransferService.triggerDownload(file.blob, file.name)}
+                        className="p-1.5 rounded-lg text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 transition"
+                        title="Download file"
+                        aria-label={`Download ${file.name}`}
+                      >
+                        <Download className="w-4 h-4" />
+                      </button>
                       <button
                         type="button"
                         onClick={() => setPreviewFile(file)}
