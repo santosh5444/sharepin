@@ -19,40 +19,51 @@ import { sanitizeFileName } from '../utils/validation';
 
 export type ProgressCallback = (progress: TransferProgress) => void;
 
+export type TransferTransport = RTCDataChannel | WebSocket;
+
 export class FileTransferService {
-  private dataChannel: RTCDataChannel;
+  private transport: TransferTransport;
   private isCancelled = false;
 
-  constructor(dataChannel: RTCDataChannel) {
-    this.dataChannel = dataChannel;
-    // Set threshold for backpressure event
-    this.dataChannel.bufferedAmountLowThreshold = BUFFERED_AMOUNT_LOW_THRESHOLD;
+  constructor(transport: TransferTransport) {
+    this.transport = transport;
+    if ('bufferedAmountLowThreshold' in this.transport) {
+      (this.transport as RTCDataChannel).bufferedAmountLowThreshold = BUFFERED_AMOUNT_LOW_THRESHOLD;
+    }
   }
 
   /**
    * Waits for data channel bufferedAmount to drain below threshold
    */
   private async waitForBufferDrain(): Promise<void> {
-    if (this.dataChannel.bufferedAmount <= BUFFERED_AMOUNT_LOW_THRESHOLD) {
+    const buffered = this.transport.bufferedAmount || 0;
+    if (buffered <= BUFFERED_AMOUNT_LOW_THRESHOLD) {
       return;
     }
 
-    return new Promise((resolve, reject) => {
-      const handleLow = () => {
-        this.dataChannel.removeEventListener('bufferedamountlow', handleLow);
-        this.dataChannel.removeEventListener('close', handleClose);
-        resolve();
-      };
+    if ('bufferedamountlow' in this.transport || 'onbufferedamountlow' in this.transport) {
+      return new Promise((resolve, reject) => {
+        const handleLow = () => {
+          this.transport.removeEventListener('bufferedamountlow', handleLow);
+          this.transport.removeEventListener('close', handleClose);
+          resolve();
+        };
 
-      const handleClose = () => {
-        this.dataChannel.removeEventListener('bufferedamountlow', handleLow);
-        this.dataChannel.removeEventListener('close', handleClose);
-        reject(new Error('DataChannel closed while waiting for buffer drain'));
-      };
+        const handleClose = () => {
+          this.transport.removeEventListener('bufferedamountlow', handleLow);
+          this.transport.removeEventListener('close', handleClose);
+          reject(new Error('Channel closed while waiting for buffer drain'));
+        };
 
-      this.dataChannel.addEventListener('bufferedamountlow', handleLow);
-      this.dataChannel.addEventListener('close', handleClose);
-    });
+        this.transport.addEventListener('bufferedamountlow', handleLow);
+        this.transport.addEventListener('close', handleClose);
+      });
+    }
+
+    // Polling fallback for WebSocket bufferedAmount
+    while ((this.transport.bufferedAmount || 0) > BUFFERED_AMOUNT_LOW_THRESHOLD) {
+      await new Promise(r => setTimeout(r, 20));
+    }
   }
 
   /**
@@ -94,11 +105,11 @@ export class FileTransferService {
         );
 
         // Check backpressure before queueing
-        if (this.dataChannel.bufferedAmount >= BUFFERED_AMOUNT_HIGH_WATERMARK) {
+        if ((this.transport.bufferedAmount || 0) >= BUFFERED_AMOUNT_HIGH_WATERMARK) {
           await this.waitForBufferDrain();
         }
 
-        this.dataChannel.send(packet.buffer as ArrayBuffer);
+        this.transport.send(packet.buffer as ArrayBuffer);
 
         fileBytesTransferred += payload.byteLength;
         totalBytesTransferred += payload.byteLength;
@@ -136,7 +147,7 @@ export class FileTransferService {
 
       // Signal completion of current file
       const endPacket = packChunk(PacketType.END_FILE, fileIndex, totalChunks, new Uint8Array(0));
-      this.dataChannel.send(endPacket.buffer as ArrayBuffer);
+      this.transport.send(endPacket.buffer as ArrayBuffer);
     }
 
     onProgress({
@@ -184,18 +195,19 @@ export class FileTransferService {
     let currentSpeedBps = 0;
 
     return new Promise((resolve, reject) => {
-      const handleMessage = async (event: MessageEvent) => {
+      const handleMessage = async (event: Event) => {
+        const msgEvent = event as MessageEvent;
         if (this.isCancelled) {
-          this.dataChannel.removeEventListener('message', handleMessage);
+          this.transport.removeEventListener('message', handleMessage);
           reject(new Error('Transfer cancelled by user'));
           return;
         }
 
-        const unpacked = unpackPacket(event.data);
+        const unpacked = unpackPacket(msgEvent.data);
         if (!unpacked) return;
 
         if (unpacked.type === PacketType.CANCEL) {
-          this.dataChannel.removeEventListener('message', handleMessage);
+          this.transport.removeEventListener('message', handleMessage);
           reject(new Error('Transfer cancelled by sender'));
           return;
         }
@@ -264,7 +276,7 @@ export class FileTransferService {
             const buffer = await combinedBlob.arrayBuffer();
             const computed = await computeSHA256(buffer);
             if (computed.toLowerCase() !== fileMeta.sha256.toLowerCase()) {
-              this.dataChannel.removeEventListener('message', handleMessage);
+              this.transport.removeEventListener('message', handleMessage);
               reject(new Error(`Integrity check failed for ${fileMeta.name}`));
               return;
             }
@@ -276,7 +288,7 @@ export class FileTransferService {
 
           // Check if all files in manifest are done
           if (unpacked.fileIndex === manifest.totalFiles - 1) {
-            this.dataChannel.removeEventListener('message', handleMessage);
+            this.transport.removeEventListener('message', handleMessage);
             onProgress({
               currentFileIndex: unpacked.fileIndex,
               currentFileName: fileMeta.name,
@@ -294,10 +306,10 @@ export class FileTransferService {
         }
       };
 
-      this.dataChannel.addEventListener('message', handleMessage);
-      this.dataChannel.addEventListener('close', () => {
+      this.transport.addEventListener('message', handleMessage);
+      this.transport.addEventListener('close', () => {
         if (totalBytesReceived < manifest.totalBytes) {
-          reject(new Error('DataChannel closed before file transfer finished'));
+          reject(new Error('Channel closed before file transfer finished'));
         }
       });
     });
@@ -322,8 +334,8 @@ export class FileTransferService {
     this.isCancelled = true;
     try {
       const cancelPacket = packChunk(PacketType.CANCEL, 0, 0, new Uint8Array(0));
-      if (this.dataChannel.readyState === 'open') {
-        this.dataChannel.send(cancelPacket.buffer as ArrayBuffer);
+      if ((this.transport as any).readyState === 'open' || this.transport.readyState === WebSocket.OPEN || (this.transport as any).readyState === 1) {
+        this.transport.send(cancelPacket.buffer as ArrayBuffer);
       }
     } catch {}
   }

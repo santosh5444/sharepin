@@ -61,8 +61,23 @@ export class SessionDO {
     }
 
     server.addEventListener('message', (event: MessageEvent) => {
+      // 1. Binary payload forwarding (raw file chunks)
+      if (typeof event.data !== 'string') {
+        const targetRole: PeerRole = role === 'sender' ? 'receiver' : 'sender';
+        const targetWs = targetRole === 'sender' ? this.senderWs : this.receiverWs;
+        if (targetWs) {
+          try {
+            targetWs.send(event.data);
+          } catch (err) {
+            console.warn('Failed to forward binary chunk:', err);
+          }
+        }
+        return;
+      }
+
+      // 2. JSON control messages
       try {
-        const data = typeof event.data === 'string' ? JSON.parse(event.data) : null;
+        const data = JSON.parse(event.data);
         if (!data || !data.type) return;
 
         const packet: SignalingPacket = {

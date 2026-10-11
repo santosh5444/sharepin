@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef } from 'react';
-import { FileTransferService } from '../services/fileTransfer';
+import { FileTransferService, TransferTransport } from '../services/fileTransfer';
 import { TransferManifest, TransferProgress, FileMetadata, DEFAULT_CHUNK_SIZE } from '../types/transfer';
 import { computeFileSHA256 } from '../utils/fileIntegrity';
 
@@ -12,7 +12,7 @@ export interface CompletedFileItem {
   sha256?: string;
 }
 
-export function useFileTransfer(dataChannel: RTCDataChannel | null) {
+export function useFileTransfer(transport: TransferTransport | null) {
   const [progress, setProgress] = useState<TransferProgress | undefined>(undefined);
   const [manifest, setManifest] = useState<TransferManifest | null>(null);
   const [receivedFiles, setReceivedFiles] = useState<CompletedFileItem[]>([]);
@@ -55,20 +55,20 @@ export function useFileTransfer(dataChannel: RTCDataChannel | null) {
   }, []);
 
   const startSending = useCallback(async (files: File[]) => {
-    if (!dataChannel) throw new Error('DataChannel is not open');
+    if (!transport) throw new Error('Transfer transport is not open');
 
-    const service = new FileTransferService(dataChannel);
+    const service = new FileTransferService(transport);
     transferServiceRef.current = service;
 
     await service.sendFiles(files, (p) => {
       setProgress({ ...p });
     });
-  }, [dataChannel]);
+  }, [transport]);
 
   const startReceiving = useCallback(async (incomingManifest: TransferManifest) => {
-    if (!dataChannel) throw new Error('DataChannel is not open');
+    if (!transport) throw new Error('Transfer transport is not open');
 
-    const service = new FileTransferService(dataChannel);
+    const service = new FileTransferService(transport);
     transferServiceRef.current = service;
 
     await service.receiveFiles(
@@ -93,7 +93,7 @@ export function useFileTransfer(dataChannel: RTCDataChannel | null) {
         FileTransferService.triggerDownload(blob, metadata.name);
       }
     );
-  }, [dataChannel]);
+  }, [transport]);
 
   const cancel = useCallback(() => {
     transferServiceRef.current?.cancel();

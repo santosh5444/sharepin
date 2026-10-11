@@ -14,7 +14,7 @@ type View = 'home' | 'send' | 'receive';
 export const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<View>('home');
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
-  const [activeDataChannel, setActiveDataChannel] = useState<RTCDataChannel | null>(null);
+  const [activeTransport, setActiveTransport] = useState<RTCDataChannel | WebSocket | null>(null);
   const [incomingManifest, setIncomingManifest] = useState<TransferManifest | null>(null);
   const [receiverAccepted, setReceiverAccepted] = useState(false);
 
@@ -45,11 +45,18 @@ export const App: React.FC = () => {
     role,
     signalingService,
     onDataChannelReady: (channel) => {
-      setActiveDataChannel(channel);
+      setActiveTransport(channel);
     },
     onError: (err) => {
-      setSessionState('FAILED');
-      setErrorMessage(`WebRTC Connection Error: ${err.message}`);
+      // If WebRTC fails (e.g. strict NAT/5G), fall back seamlessly to signaling WebSocket
+      const ws = signalingService.getWebSocketTransport();
+      if (ws) {
+        console.warn('WebRTC failed, falling back to instant WebSocket relay:', err.message);
+        setActiveTransport(ws);
+      } else {
+        setSessionState('FAILED');
+        setErrorMessage(`Connection Error: ${err.message}`);
+      }
     },
   });
 
@@ -60,12 +67,12 @@ export const App: React.FC = () => {
     startSending,
     startReceiving,
     cancel: cancelTransfer,
-  } = useFileTransfer(activeDataChannel);
+  } = useFileTransfer(activeTransport);
 
   const resetAll = () => {
     resetSession();
     closePeerConnection();
-    setActiveDataChannel(null);
+    setActiveTransport(null);
     setIncomingManifest(null);
     setSelectedFiles([]);
     setReceiverAccepted(false);
@@ -205,14 +212,30 @@ export const App: React.FC = () => {
     signalingService.sendMessage('SENDER_APPROVED', null, 'receiver', sessionId);
   };
 
+  // NAT Traversal / 5G Fallback timer:
+  // If receiver accepted transfer but WebRTC DataChannel hasn't opened within 1.5 seconds,
+  // automatically fall back to the live Cloudflare WebSocket relay.
+  useEffect(() => {
+    if (receiverAccepted && !activeTransport) {
+      const timer = setTimeout(() => {
+        const ws = signalingService.getWebSocketTransport();
+        if (ws) {
+          console.log('Direct P2P DataChannel timeout (5G/Symmetric NAT). Engaging instant Cloudflare edge relay.');
+          setActiveTransport(ws);
+        }
+      }, 1500);
+      return () => clearTimeout(timer);
+    }
+  }, [receiverAccepted, activeTransport, signalingService]);
+
   const isSendingRef = useRef(false);
   const isReceivingRef = useRef(false);
 
-  // 6. SENDER: Start file stream when DataChannel is open AND receiver accepted
+  // 6. SENDER: Start file stream when transport is open AND receiver accepted
   useEffect(() => {
     if (
       role === 'sender' &&
-      activeDataChannel &&
+      activeTransport &&
       receiverAccepted &&
       selectedFiles.length > 0 &&
       !isSendingRef.current
@@ -228,13 +251,13 @@ export const App: React.FC = () => {
           setErrorMessage(err.message || 'Transfer error');
         });
     }
-  }, [role, activeDataChannel, receiverAccepted, selectedFiles, startSending, setSessionState, setErrorMessage]);
+  }, [role, activeTransport, receiverAccepted, selectedFiles, startSending, setSessionState, setErrorMessage]);
 
-  // 7. RECEIVER: Start receiving files when DataChannel is open AND accepted
+  // 7. RECEIVER: Start receiving files when transport is open AND accepted
   useEffect(() => {
     if (
       role === 'receiver' &&
-      activeDataChannel &&
+      activeTransport &&
       receiverAccepted &&
       incomingManifest &&
       !isReceivingRef.current
@@ -250,7 +273,7 @@ export const App: React.FC = () => {
           setErrorMessage(err.message || 'Transfer failed');
         });
     }
-  }, [role, activeDataChannel, receiverAccepted, incomingManifest, startReceiving, setSessionState, setErrorMessage]);
+  }, [role, activeTransport, receiverAccepted, incomingManifest, startReceiving, setSessionState, setErrorMessage]);
 
   // Audio Chime on Completion
   useEffect(() => {

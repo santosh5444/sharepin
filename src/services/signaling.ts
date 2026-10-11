@@ -133,6 +133,10 @@ export class SignalingService {
       };
 
       this.ws.onmessage = (event) => {
+        // If data is binary (ArrayBuffer/Blob), it is a file transfer packet, not JSON signaling
+        if (typeof event.data !== 'string') {
+          return;
+        }
         try {
           const msg = JSON.parse(event.data) as SignalingMessage;
           callbacks.onMessage(msg);
@@ -182,6 +186,14 @@ export class SignalingService {
       try { this.localChannel.close(); } catch {}
       this.localChannel = null;
     }
+  }
+
+  public getWebSocketTransport(): WebSocket | null {
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      this.ws.binaryType = 'arraybuffer';
+      return this.ws;
+    }
+    return null;
   }
 
   // --- LOCAL DEV BROADCASTCHANNEL MESH (FOR OFFLINE / STANDALONE DEV) ---
