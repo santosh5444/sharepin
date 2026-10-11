@@ -23,6 +23,7 @@ interface SendProps {
   transferProgress?: TransferProgressType;
   errorMessage?: string | null;
   onReset?: () => void;
+  isDirectP2P?: boolean;
 }
 
 export const Send: React.FC<SendProps> = ({
@@ -37,6 +38,7 @@ export const Send: React.FC<SendProps> = ({
   transferProgress,
   errorMessage = null,
   onReset,
+  isDirectP2P,
 }) => {
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [copiedPin, setCopiedPin] = useState(false);
@@ -264,6 +266,7 @@ export const Send: React.FC<SendProps> = ({
               progress={transferProgress}
               onCancel={onCancelTransfer}
               role="sender"
+              isDirectP2P={isDirectP2P}
             />
           ) : (
             <div className="bg-white border-2 border-brand-500 rounded-3xl p-8 text-center shadow-md">

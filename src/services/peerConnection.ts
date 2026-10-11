@@ -22,14 +22,6 @@ const DEFAULT_ICE_SERVERS: RTCIceServer[] = [
       'stun:stun4.l.google.com:19302',
     ],
   },
-  {
-    urls: [
-      'turn:openrelay.metered.ca:80',
-      'turn:openrelay.metered.ca:443',
-    ],
-    username: 'openrelayproject',
-    credential: 'openrelayproject',
-  },
 ];
 
 export class PeerConnectionService {
@@ -47,7 +39,7 @@ export class PeerConnectionService {
     }
 
     const iceServers = this.config.stunServers && this.config.stunServers.length > 0
-      ? [{ urls: this.config.stunServers }, ...DEFAULT_ICE_SERVERS.slice(1)]
+      ? [{ urls: this.config.stunServers }, ...DEFAULT_ICE_SERVERS]
       : DEFAULT_ICE_SERVERS;
 
     this.pc = new RTCPeerConnection({

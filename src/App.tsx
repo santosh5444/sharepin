@@ -221,8 +221,10 @@ export const App: React.FC = () => {
         sessionId
       );
 
-      // Initiate WebRTC Offer
-      await startOffer();
+      // Initiate WebRTC Offer if not already established
+      if (!activeTransport || (activeTransport instanceof RTCDataChannel && activeTransport.readyState !== 'open')) {
+        await startOffer();
+      }
     } catch (err: any) {
       setSessionState('FAILED');
       setErrorMessage(`Failed to initiate connection: ${err.message}`);
@@ -243,18 +245,18 @@ export const App: React.FC = () => {
   };
 
   // Synchronized NAT Traversal / 5G Fallback timer:
-  // If receiver accepted transfer but WebRTC DataChannel hasn't opened within 2.0 seconds,
-  // automatically signal peer and switch both to the Cloudflare edge WebSocket relay.
+  // Give direct WebRTC STUN NAT punch-through 5.0 seconds across cellular/Wi-Fi carriers
+  // before switching peers to high-throughput Cloudflare edge WebSocket relay.
   useEffect(() => {
     if (receiverAccepted && (!activeTransport || (activeTransport instanceof RTCDataChannel && activeTransport.readyState !== 'open'))) {
       const timer = setTimeout(() => {
         const ws = signalingService.getWebSocketTransport();
         if (ws && (activeTransport as any) !== ws) {
-          console.log('WebRTC connection not open within 2.5s (likely 5G NAT). Engaging Cloudflare Edge Relay.');
+          console.log('WebRTC connection not open within 5.0s (likely symmetric NAT). Engaging Cloudflare Edge Relay.');
           signalingService.sendMessage('FALLBACK_TO_RELAY', null, role, sessionId);
           fallbackToRelayTransport();
         }
-      }, 2500);
+      }, 5000);
       return () => clearTimeout(timer);
     }
   }, [receiverAccepted, activeTransport, signalingService, role, sessionId, fallbackToRelayTransport]);
@@ -373,6 +375,7 @@ export const App: React.FC = () => {
             transferProgress={transferProgress}
             errorMessage={errorMessage}
             onReset={resetAll}
+            isDirectP2P={activeTransport instanceof RTCDataChannel}
           />
         )}
 
@@ -395,6 +398,7 @@ export const App: React.FC = () => {
             transferProgress={transferProgress}
             errorMessage={errorMessage}
             onReset={resetAll}
+            isDirectP2P={activeTransport instanceof RTCDataChannel}
           />
         )}
       </main>

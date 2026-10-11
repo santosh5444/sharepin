@@ -83,18 +83,30 @@ export function usePeerConnection(options: UsePeerConnectionOptions) {
     await peerServiceRef.current.addIceCandidate(candidate);
   }, []);
 
+  const offerInitiatedRef = useRef(false);
+
   const startOffer = useCallback(async () => {
     if (!peerServiceRef.current) return;
-    const offer = await peerServiceRef.current.createOffer();
-    optionsRef.current.signalingService.sendMessage(
-      'OFFER',
-      offer,
-      optionsRef.current.role,
-      optionsRef.current.sessionId
-    );
+    if (offerInitiatedRef.current) {
+      return;
+    }
+    offerInitiatedRef.current = true;
+    try {
+      const offer = await peerServiceRef.current.createOffer();
+      optionsRef.current.signalingService.sendMessage(
+        'OFFER',
+        offer,
+        optionsRef.current.role,
+        optionsRef.current.sessionId
+      );
+    } catch (err) {
+      offerInitiatedRef.current = false;
+      throw err;
+    }
   }, []);
 
   const close = useCallback(() => {
+    offerInitiatedRef.current = false;
     peerServiceRef.current?.close();
     peerServiceRef.current = null;
     setConnectionState('closed');

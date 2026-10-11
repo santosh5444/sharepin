@@ -39,6 +39,7 @@ interface ReceiveProps {
   transferProgress?: TransferProgressType;
   errorMessage?: string | null;
   onReset?: () => void;
+  isDirectP2P?: boolean;
 }
 
 function getFileIcon(name: string, type: string) {
@@ -69,6 +70,7 @@ export const Receive: React.FC<ReceiveProps> = ({
   transferProgress,
   errorMessage = null,
   onReset,
+  isDirectP2P,
 }) => {
   const [pin, setPin] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -258,6 +260,7 @@ export const Receive: React.FC<ReceiveProps> = ({
               progress={transferProgress}
               onCancel={onCancelTransfer}
               role="receiver"
+              isDirectP2P={isDirectP2P}
             />
           ) : (
             <div className="bg-white border-2 border-emerald-500 rounded-3xl p-8 text-center shadow-md">

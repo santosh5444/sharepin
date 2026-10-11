@@ -8,12 +8,14 @@ interface TransferProgressProps {
   progress: TransferProgressType;
   onCancel?: () => void;
   role: 'sender' | 'receiver';
+  isDirectP2P?: boolean;
 }
 
 export const TransferProgress: React.FC<TransferProgressProps> = ({
   progress,
   onCancel,
   role,
+  isDirectP2P,
 }) => {
   const [speedHistory, setSpeedHistory] = React.useState<number[]>([]);
 
@@ -31,9 +33,20 @@ export const TransferProgress: React.FC<TransferProgressProps> = ({
     <div className="w-full bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
       <div className="flex items-center justify-between mb-3">
         <div>
-          <span className="text-xs font-semibold uppercase tracking-wider text-brand-600">
-            {role === 'sender' ? 'Uploading to Peer' : 'Receiving from Peer'}
-          </span>
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-xs font-semibold uppercase tracking-wider text-brand-600">
+              {role === 'sender' ? 'Uploading to Peer' : 'Receiving from Peer'}
+            </span>
+            {isDirectP2P !== undefined && (
+              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                isDirectP2P
+                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                  : 'bg-indigo-50 text-indigo-700 border-indigo-200'
+              }`}>
+                {isDirectP2P ? '⚡ Direct P2P (Max Speed)' : '☁️ Cloudflare Edge Relay'}
+              </span>
+            )}
+          </div>
           <h4 className="text-base font-bold text-slate-800 truncate max-w-md">
             {progress.currentFileName || 'Preparing transfer...'}
           </h4>
