@@ -1,5 +1,5 @@
 import React from 'react';
-import { Upload, Download, ShieldCheck, Zap, HardDrive, KeyRound, ArrowRight } from 'lucide-react';
+import { Upload, Download, ShieldCheck, HardDrive, KeyRound, ArrowRight } from 'lucide-react';
 
 interface HomeProps {
   onSelectSend: () => void;
@@ -12,7 +12,7 @@ export const Home: React.FC<HomeProps> = ({ onSelectSend, onSelectReceive }) => 
       {/* Hero Header */}
       <div className="text-center max-w-2xl mx-auto mb-12 sm:mb-16">
         <div className="inline-flex items-center space-x-2 px-3 py-1.5 rounded-full bg-brand-50 border border-brand-100 text-brand-700 text-xs sm:text-sm font-medium mb-6">
-          <Zap className="w-4 h-4 text-brand-600" />
+          <img src="/logo.png" alt="SharePin" className="w-4 h-4 rounded-md object-cover" />
           <span>Peer-to-Peer • 5-Digit PIN • No Sign-up</span>
         </div>
 

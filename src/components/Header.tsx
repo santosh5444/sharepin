@@ -1,5 +1,5 @@
 import React from 'react';
-import { ShieldCheck, Zap, ArrowLeft } from 'lucide-react';
+import { ShieldCheck, ArrowLeft } from 'lucide-react';
 
 interface HeaderProps {
   currentView?: 'home' | 'send' | 'receive';
@@ -25,8 +25,8 @@ export const Header: React.FC<HeaderProps> = ({ currentView = 'home', onNavigate
             onClick={onNavigateHome}
             className="flex items-center space-x-2.5 cursor-pointer select-none group"
           >
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-brand-600 to-brand-400 flex items-center justify-center text-white shadow-sm shadow-brand-500/20 group-hover:scale-105 transition-transform">
-              <Zap className="w-5 h-5" />
+            <div className="w-9 h-9 rounded-xl overflow-hidden shadow-sm shadow-brand-500/20 group-hover:scale-105 transition-transform flex items-center justify-center">
+              <img src="/logo.png" alt="SharePin Icon" className="w-full h-full object-cover" />
             </div>
             <div>
               <span className="font-bold text-lg tracking-tight text-slate-900">
