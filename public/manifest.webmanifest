@@ -1,0 +1,17 @@
+{
+  "name": "SharePin",
+  "short_name": "SharePin",
+  "description": "Share files directly between devices with a temporary 5-digit PIN. Zero permanent storage.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0284c7",
+  "theme_color": "#ffffff",
+  "icons": [
+    {
+      "src": "/logo.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

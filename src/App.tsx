@@ -7,6 +7,7 @@ import { useSession } from './hooks/useSession';
 import { usePeerConnection } from './hooks/usePeerConnection';
 import { useFileTransfer } from './hooks/useFileTransfer';
 import { TransferManifest } from './types/transfer';
+import { playSuccessChime } from './utils/audioFeedback';
 
 type View = 'home' | 'send' | 'receive';
 
@@ -248,6 +249,25 @@ export const App: React.FC = () => {
         });
     }
   }, [role, activeDataChannel, receiverAccepted, incomingManifest, startReceiving, setSessionState, setErrorMessage]);
+
+  // Audio Chime on Completion
+  useEffect(() => {
+    if (sessionState === 'COMPLETED') {
+      playSuccessChime();
+    }
+  }, [sessionState]);
+
+  // Scan-to-Receive: Detect ?pin=XXXXX query parameter on load
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const pinParam = urlParams.get('pin');
+    if (pinParam && /^[0-9]{5}$/.test(pinParam)) {
+      setCurrentView('receive');
+      handleJoinSession(pinParam);
+      // Clean up URL without reload
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, []);
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 text-slate-900">

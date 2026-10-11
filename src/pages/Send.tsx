@@ -7,7 +7,8 @@ import { ErrorMessage } from '../components/ErrorMessage';
 import { SessionState } from '../types/session';
 import { TransferProgress as TransferProgressType } from '../types/transfer';
 import { formatBytes } from '../utils/formatBytes';
-import { Copy, Check, Clock, UserCheck, ArrowLeft, RotateCcw } from 'lucide-react';
+import { Copy, Check, Clock, UserCheck, ArrowLeft, RotateCcw, QrCode } from 'lucide-react';
+import { QRCodeModal } from '../components/QRCodeModal';
 
 interface SendProps {
   onBack: () => void;
@@ -39,6 +40,7 @@ export const Send: React.FC<SendProps> = ({
 }) => {
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [copiedPin, setCopiedPin] = useState(false);
+  const [showQrModal, setShowQrModal] = useState(false);
   const [timeLeftSeconds, setTimeLeftSeconds] = useState<number>(180);
 
   // 3-minute countdown timer logic
@@ -161,20 +163,36 @@ export const Send: React.FC<SendProps> = ({
             Share this temporary PIN
           </span>
 
-          {/* Large 5-digit PIN display with leading zeroes */}
-          <div className="my-6 inline-flex items-center justify-center px-6 py-4 bg-slate-50 border-2 border-brand-200 rounded-3xl space-x-3">
+          {/* Large 5-digit PIN display with leading zeroes + QR code button */}
+          <div className="my-6 inline-flex items-center justify-center px-6 py-4 bg-slate-50 border-2 border-brand-200 rounded-3xl space-x-2 sm:space-x-3">
             <span className="font-mono text-4xl sm:text-6xl font-black tracking-widest text-brand-700 select-all">
               {pin || '-----'}
             </span>
-            <button
-              onClick={handleCopyPin}
-              className="p-3 rounded-2xl bg-white border border-slate-200 shadow-sm hover:bg-slate-50 active:scale-95 text-slate-600 hover:text-brand-600 transition"
-              title="Copy PIN"
-              aria-label="Copy 5-digit PIN"
-            >
-              {copiedPin ? <Check className="w-5 h-5 text-emerald-600" /> : <Copy className="w-5 h-5" />}
-            </button>
+            <div className="flex items-center space-x-1 sm:space-x-2 pl-2 border-l border-slate-200">
+              <button
+                onClick={handleCopyPin}
+                className="p-3 rounded-2xl bg-white border border-slate-200 shadow-sm hover:bg-slate-50 active:scale-95 text-slate-600 hover:text-brand-600 transition"
+                title="Copy PIN"
+                aria-label="Copy 5-digit PIN"
+              >
+                {copiedPin ? <Check className="w-5 h-5 text-emerald-600" /> : <Copy className="w-5 h-5" />}
+              </button>
+              <button
+                onClick={() => setShowQrModal(true)}
+                className="p-3 rounded-2xl bg-white border border-slate-200 shadow-sm hover:bg-slate-50 active:scale-95 text-slate-600 hover:text-brand-600 transition"
+                title="Show QR Code"
+                aria-label="Show QR Code for scanning with camera"
+              >
+                <QrCode className="w-5 h-5" />
+              </button>
+            </div>
           </div>
+
+          <QRCodeModal
+            pin={pin}
+            isOpen={showQrModal}
+            onClose={() => setShowQrModal(false)}
+          />
 
           {/* 2-Minute Expiry Countdown */}
           <div className="flex items-center justify-center space-x-2 text-sm text-slate-600 mb-6">

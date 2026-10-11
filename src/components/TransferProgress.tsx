@@ -38,11 +38,17 @@ export const TransferProgress: React.FC<TransferProgressProps> = ({
       </div>
 
       {/* Progress bar */}
-      <div className="w-full bg-slate-100 rounded-full h-3 overflow-hidden mb-4">
+      <div className="w-full bg-slate-100 rounded-full h-3 overflow-hidden mb-3">
         <div
           className="bg-gradient-to-r from-brand-600 to-brand-400 h-3 rounded-full transition-all duration-200"
           style={{ width: `${percent}%` }}
         />
+      </div>
+
+      {/* Keep tab open guidance */}
+      <div className="text-[11px] text-slate-500 bg-slate-50 border border-slate-200/60 rounded-xl px-3 py-1.5 mb-3 flex items-center justify-between">
+        <span>💡 Keep this browser tab open until the transfer completes.</span>
+        <span className="font-mono text-brand-600 font-semibold">{formatBytes(progress.totalBytesTransferred)} / {formatBytes(progress.totalBytes)}</span>
       </div>
 
       {/* Metrics Row */}
