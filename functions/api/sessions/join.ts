@@ -1,31 +1,20 @@
-import { globalRegistry } from '../../_shared/pinRegistry';
+const WORKER_ORIGIN = 'https://sharepin-worker.ramasantoshreddydwarampudi.workers.dev';
 
 export async function onRequestPost({ request }: { request: Request }): Promise<Response> {
-  let body: { pin?: string };
   try {
-    body = await request.json() as { pin?: string };
-  } catch {
-    return Response.json({ error: 'INVALID_JSON' }, { status: 400 });
+    const body = await request.text();
+    const res = await fetch(`${WORKER_ORIGIN}/api/sessions/join`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'cf-connecting-ip': request.headers.get('cf-connecting-ip') || '',
+      },
+      body,
+    });
+    return res;
+  } catch (err: any) {
+    return Response.json({ error: 'WORKER_UNAVAILABLE', message: err.message }, { status: 502 });
   }
-
-  const pin = body.pin?.trim();
-  if (!pin || !/^[0-9]{5}$/.test(pin)) {
-    return Response.json(
-      { error: 'INVALID_PIN', message: 'PIN must be exactly 5 digits.' },
-      { status: 400 }
-    );
-  }
-
-  const result = globalRegistry.joinSession(pin);
-  const status = result.success ? 200 : 400;
-
-  return Response.json(result, {
-    status,
-    headers: {
-      'Content-Type': 'application/json',
-      'Access-Control-Allow-Origin': '*',
-    },
-  });
 }
 
 export async function onRequestOptions(): Promise<Response> {
