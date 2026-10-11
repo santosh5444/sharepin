@@ -6,7 +6,7 @@ import { ErrorMessage } from '../components/ErrorMessage';
 import { SessionState } from '../types/session';
 import { TransferManifest, TransferProgress as TransferProgressType } from '../types/transfer';
 import { formatBytes } from '../utils/formatBytes';
-import { Download, Check, ShieldCheck, ArrowLeft, RotateCcw, FileBox } from 'lucide-react';
+import { Download, Check, ShieldCheck, ArrowLeft, RotateCcw, FileBox, Loader2 } from 'lucide-react';
 
 interface ReceiveProps {
   onBack: () => void;
@@ -119,8 +119,27 @@ export const Receive: React.FC<ReceiveProps> = ({
         </div>
       )}
 
-      {/* Step 2: Waiting for Sender Approval or Incoming Manifest Preview */}
-      {sessionState === 'RECEIVER_JOINED' && incomingManifest && (
+      {/* Step 2: Waiting for Sender Approval */}
+      {(sessionState === 'CONNECTING' || sessionState === 'RECEIVER_JOINED') && !incomingManifest && (
+        <div className="bg-white border border-slate-200 rounded-3xl p-8 sm:p-10 shadow-sm text-center">
+          <div className="w-16 h-16 rounded-2xl bg-brand-50 text-brand-600 flex items-center justify-center mx-auto mb-4 animate-pulse">
+            <Loader2 className="w-8 h-8 animate-spin" />
+          </div>
+          <h3 className="text-xl font-bold text-slate-900">
+            Connected to Sender!
+          </h3>
+          <p className="text-sm text-slate-600 mt-2 max-w-md mx-auto">
+            Please approve the transfer on the sender's device. Once the sender approves, you will be able to review and download the incoming files.
+          </p>
+          <div className="mt-6 inline-flex items-center space-x-2 text-xs font-semibold text-brand-700 bg-brand-50 px-4 py-2 rounded-full border border-brand-200">
+            <span className="w-2 h-2 rounded-full bg-brand-600 animate-ping" />
+            <span>Waiting for sender to click "Approve & Send"</span>
+          </div>
+        </div>
+      )}
+
+      {/* Step 3: Incoming Manifest Preview (After Sender Approves) */}
+      {(sessionState === 'RECEIVER_JOINED' || sessionState === 'CONNECTING') && incomingManifest && (
         <div className="bg-white border-2 border-emerald-500 rounded-3xl p-6 sm:p-8 shadow-md">
           <div className="text-center mb-6">
             <div className="w-14 h-14 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto mb-3">

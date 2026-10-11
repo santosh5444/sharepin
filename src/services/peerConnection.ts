@@ -82,6 +82,8 @@ export class PeerConnectionService {
     };
   }
 
+  private queuedCandidates: RTCIceCandidateInit[] = [];
+
   public async createOffer(): Promise<RTCSessionDescriptionInit> {
     if (!this.pc) throw new Error('RTCPeerConnection is not initialized');
     const offer = await this.pc.createOffer();
@@ -94,6 +96,7 @@ export class PeerConnectionService {
   ): Promise<RTCSessionDescriptionInit> {
     if (!this.pc) throw new Error('RTCPeerConnection is not initialized');
     await this.pc.setRemoteDescription(new RTCSessionDescription(offer));
+    await this.flushQueuedCandidates();
     const answer = await this.pc.createAnswer();
     await this.pc.setLocalDescription(answer);
     return answer;
@@ -102,15 +105,32 @@ export class PeerConnectionService {
   public async handleAnswer(answer: RTCSessionDescriptionInit): Promise<void> {
     if (!this.pc) throw new Error('RTCPeerConnection is not initialized');
     await this.pc.setRemoteDescription(new RTCSessionDescription(answer));
+    await this.flushQueuedCandidates();
   }
 
   public async addIceCandidate(candidateInit: RTCIceCandidateInit): Promise<void> {
-    if (!this.pc) return;
+    if (!this.pc || !this.pc.remoteDescription) {
+      this.queuedCandidates.push(candidateInit);
+      return;
+    }
     try {
       await this.pc.addIceCandidate(new RTCIceCandidate(candidateInit));
     } catch (err) {
-      // Harmless if connection already established
       console.warn('Could not add ICE candidate:', err);
+    }
+  }
+
+  private async flushQueuedCandidates(): Promise<void> {
+    if (!this.pc || !this.pc.remoteDescription) return;
+    while (this.queuedCandidates.length > 0) {
+      const candidate = this.queuedCandidates.shift();
+      if (candidate) {
+        try {
+          await this.pc.addIceCandidate(new RTCIceCandidate(candidate));
+        } catch (err) {
+          console.warn('Failed to add queued candidate:', err);
+        }
+      }
     }
   }
 

@@ -15,26 +15,29 @@ export function usePeerConnection(options: UsePeerConnectionOptions) {
   const [connectionState, setConnectionState] = useState<RTCPeerConnectionState>('new');
   const peerServiceRef = useRef<PeerConnectionService | null>(null);
 
+  const optionsRef = useRef(options);
+  optionsRef.current = options;
+
   const initConnection = useCallback(() => {
-    const isInitiator = options.role === 'sender';
+    const isInitiator = optionsRef.current.role === 'sender';
 
     const pc = new PeerConnectionService({
       onIceCandidate: (candidate) => {
-        options.signalingService.sendMessage(
+        optionsRef.current.signalingService.sendMessage(
           'ICE_CANDIDATE',
           candidate.toJSON(),
-          options.role,
-          options.sessionId
+          optionsRef.current.role,
+          optionsRef.current.sessionId
         );
       },
       onConnectionStateChange: (state) => {
         setConnectionState(state);
       },
       onDataChannelOpened: (channel) => {
-        options.onDataChannelReady(channel);
+        optionsRef.current.onDataChannelReady(channel);
       },
       onError: (err) => {
-        options.onError(err);
+        optionsRef.current.onError(err);
       },
     });
 
@@ -42,13 +45,18 @@ export function usePeerConnection(options: UsePeerConnectionOptions) {
     pc.initialize(isInitiator);
 
     return pc;
-  }, [options]);
+  }, []);
 
   const handleOffer = useCallback(async (offer: RTCSessionDescriptionInit) => {
     if (!peerServiceRef.current) return;
     const answer = await peerServiceRef.current.handleOfferAndCreateAnswer(offer);
-    options.signalingService.sendMessage('ANSWER', answer, options.role, options.sessionId);
-  }, [options]);
+    optionsRef.current.signalingService.sendMessage(
+      'ANSWER',
+      answer,
+      optionsRef.current.role,
+      optionsRef.current.sessionId
+    );
+  }, []);
 
   const handleAnswer = useCallback(async (answer: RTCSessionDescriptionInit) => {
     if (!peerServiceRef.current) return;

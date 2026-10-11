@@ -15,6 +15,7 @@ export const App: React.FC = () => {
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [activeDataChannel, setActiveDataChannel] = useState<RTCDataChannel | null>(null);
   const [incomingManifest, setIncomingManifest] = useState<TransferManifest | null>(null);
+  const [receiverAccepted, setReceiverAccepted] = useState(false);
 
   const {
     sessionState,
@@ -44,7 +45,6 @@ export const App: React.FC = () => {
     signalingService,
     onDataChannelReady: (channel) => {
       setActiveDataChannel(channel);
-      setSessionState('CONNECTED');
     },
     onError: (err) => {
       setSessionState('FAILED');
@@ -60,15 +60,13 @@ export const App: React.FC = () => {
     cancel: cancelTransfer,
   } = useFileTransfer(activeDataChannel);
 
-  const isSenderRef = useRef(false);
-  isSenderRef.current = role === 'sender';
-
   const resetAll = () => {
     resetSession();
     closePeerConnection();
     setActiveDataChannel(null);
     setIncomingManifest(null);
     setSelectedFiles([]);
+    setReceiverAccepted(false);
   };
 
   const handleNavigateHome = () => {
@@ -85,7 +83,7 @@ export const App: React.FC = () => {
             if (peerRole === 'sender') {
               setSessionState('RECEIVER_JOINED');
             } else {
-              setSessionState('CONNECTING');
+              setSessionState('RECEIVER_JOINED');
             }
             break;
 
@@ -114,8 +112,9 @@ export const App: React.FC = () => {
             break;
 
           case 'SENDER_APPROVED':
-            if (peerRole === 'receiver') {
-              setSessionState('CONNECTING');
+            // Receiver accepted transfer
+            if (peerRole === 'sender') {
+              setReceiverAccepted(true);
             }
             break;
 
@@ -138,7 +137,6 @@ export const App: React.FC = () => {
         }
       },
       onError: () => {
-        // Fallback for offline or local preview
         console.warn('Signaling WebSocket error or offline');
       },
     });
@@ -174,7 +172,7 @@ export const App: React.FC = () => {
       setSessionState('CONNECTING');
       initConnection();
 
-      // Send approval & manifest to receiver
+      // Send manifest preview to receiver
       const manifest = await prepareManifest(selectedFiles);
       signalingService.sendMessage(
         'SENDER_APPROVAL_REQUEST',
@@ -183,7 +181,7 @@ export const App: React.FC = () => {
         sessionId
       );
 
-      // Start WebRTC Offer
+      // Initiate WebRTC Offer
       await startOffer();
     } catch (err: any) {
       setSessionState('FAILED');
@@ -198,24 +196,25 @@ export const App: React.FC = () => {
   };
 
   // 5. RECEIVER: Accepts transfer
-  const handleAcceptTransfer = async () => {
-    setSessionState('TRANSFERRING');
+  const handleAcceptTransfer = () => {
+    setReceiverAccepted(true);
+    setSessionState('CONNECTING');
     signalingService.sendMessage('SENDER_APPROVED', null, 'receiver', sessionId);
-
-    if (incomingManifest && activeDataChannel) {
-      try {
-        await startReceiving(incomingManifest);
-        setSessionState('COMPLETED');
-      } catch (err: any) {
-        setSessionState('FAILED');
-        setErrorMessage(err.message || 'Transfer failed');
-      }
-    }
   };
 
-  // 6. When DataChannel opens and sender is ready, start file streaming
+  const isSendingRef = useRef(false);
+  const isReceivingRef = useRef(false);
+
+  // 6. SENDER: Start file stream when DataChannel is open AND receiver accepted
   useEffect(() => {
-    if (activeDataChannel && role === 'sender' && sessionState === 'CONNECTED' && selectedFiles.length > 0) {
+    if (
+      role === 'sender' &&
+      activeDataChannel &&
+      receiverAccepted &&
+      selectedFiles.length > 0 &&
+      !isSendingRef.current
+    ) {
+      isSendingRef.current = true;
       setSessionState('TRANSFERRING');
       startSending(selectedFiles)
         .then(() => {
@@ -226,7 +225,29 @@ export const App: React.FC = () => {
           setErrorMessage(err.message || 'Transfer error');
         });
     }
-  }, [activeDataChannel, role, sessionState, selectedFiles, startSending, setSessionState, setErrorMessage]);
+  }, [role, activeDataChannel, receiverAccepted, selectedFiles, startSending, setSessionState, setErrorMessage]);
+
+  // 7. RECEIVER: Start receiving files when DataChannel is open AND accepted
+  useEffect(() => {
+    if (
+      role === 'receiver' &&
+      activeDataChannel &&
+      receiverAccepted &&
+      incomingManifest &&
+      !isReceivingRef.current
+    ) {
+      isReceivingRef.current = true;
+      setSessionState('TRANSFERRING');
+      startReceiving(incomingManifest)
+        .then(() => {
+          setSessionState('COMPLETED');
+        })
+        .catch((err) => {
+          setSessionState('FAILED');
+          setErrorMessage(err.message || 'Transfer failed');
+        });
+    }
+  }, [role, activeDataChannel, receiverAccepted, incomingManifest, startReceiving, setSessionState, setErrorMessage]);
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 text-slate-900">
