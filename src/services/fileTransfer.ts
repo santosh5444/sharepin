@@ -253,25 +253,36 @@ export class FileTransferService {
         const now = Date.now();
         const elapsedSinceMetrics = (now - lastMetricsTime) / 1000;
         if (elapsedSinceMetrics >= 0.25 || chunkIndex === totalChunks - 1) {
-          const bytesDiff = totalBytesTransferred - lastBytesSample;
-          const instantaneousSpeed = bytesDiff / (elapsedSinceMetrics || 0.001);
+          // Account for bytes currently buffered in the outgoing network socket
+          const buffered = this.transport.bufferedAmount || 0;
+          const actualTransferred = Math.min(
+            totalBytes,
+            Math.max(0, totalBytesTransferred - buffered)
+          );
+          const actualFileTransferred = Math.min(
+            file.size,
+            Math.max(0, fileBytesTransferred - buffered)
+          );
+
+          const bytesDiff = actualTransferred - lastBytesSample;
+          const instantaneousSpeed = Math.max(0, bytesDiff / (elapsedSinceMetrics || 0.001));
           currentSpeedBps = currentSpeedBps === 0
             ? instantaneousSpeed
             : currentSpeedBps * 0.7 + instantaneousSpeed * 0.3; // EMA smoothing
 
           lastMetricsTime = now;
-          lastBytesSample = totalBytesTransferred;
+          lastBytesSample = actualTransferred;
 
-          const remainingBytes = Math.max(0, totalBytes - totalBytesTransferred);
+          const remainingBytes = Math.max(0, totalBytes - actualTransferred);
           const eta = currentSpeedBps > 0 ? remainingBytes / currentSpeedBps : null;
 
           onProgress({
             currentFileIndex: fileIndex,
             currentFileName: file.name,
-            currentFileBytesTransferred: fileBytesTransferred,
+            currentFileBytesTransferred: actualFileTransferred,
             currentFileSize: file.size,
             totalFiles: files.length,
-            totalBytesTransferred,
+            totalBytesTransferred: actualTransferred,
             totalBytes,
             speedBps: currentSpeedBps,
             etaSeconds: eta,
@@ -279,6 +290,9 @@ export class FileTransferService {
           });
         }
       }
+
+      // Flush remaining buffered bytes to physical wire before signaling file end
+      await this.waitForBufferDrain();
 
       // Signal completion of current file
       const endPacket = packChunk(PacketType.END_FILE, fileIndex, totalChunks, new Uint8Array(0));
