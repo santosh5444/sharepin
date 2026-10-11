@@ -20,6 +20,10 @@ export function usePeerConnection(options: UsePeerConnectionOptions) {
   optionsRef.current = options;
 
   const initConnection = useCallback(() => {
+    if (peerServiceRef.current) {
+      return peerServiceRef.current;
+    }
+
     const isInitiator = optionsRef.current.role === 'sender';
 
     const pc = new PeerConnectionService({

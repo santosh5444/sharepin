@@ -71,11 +71,17 @@ export const Receive: React.FC<ReceiveProps> = ({
 }) => {
   const [pin, setPin] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [hasAccepted, setHasAccepted] = useState(false);
   const [previewFile, setPreviewFile] = useState<PreviewableFile | null>(null);
   const [isZipping, setIsZipping] = useState(false);
 
   const handlePinChange = (newPin: string) => {
     setPin(newPin);
+  };
+
+  const handleAccept = () => {
+    setHasAccepted(true);
+    onAcceptTransfer?.();
   };
 
   const handleJoin = async (e?: React.FormEvent) => {
@@ -187,7 +193,7 @@ export const Receive: React.FC<ReceiveProps> = ({
       )}
 
       {/* Step 3: Incoming Manifest Preview (After Sender Approves) */}
-      {(sessionState === 'RECEIVER_JOINED' || sessionState === 'CONNECTING') && incomingManifest && (
+      {(sessionState === 'RECEIVER_JOINED' || sessionState === 'CONNECTING') && incomingManifest && !hasAccepted && (
         <div className="bg-white border-2 border-emerald-500 rounded-3xl p-6 sm:p-8 shadow-md">
           <div className="text-center mb-6">
             <div className="w-14 h-14 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto mb-3">
@@ -220,7 +226,7 @@ export const Receive: React.FC<ReceiveProps> = ({
           <div className="flex items-center justify-center space-x-4">
             <button
               type="button"
-              onClick={onAcceptTransfer}
+              onClick={handleAccept}
               className="px-6 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-bold text-sm shadow-md shadow-emerald-600/20 transition flex items-center space-x-2"
             >
               <Download className="w-4 h-4" />
@@ -238,14 +244,24 @@ export const Receive: React.FC<ReceiveProps> = ({
       )}
 
       {/* Step 4: Connecting / Transferring */}
-      {(sessionState === 'CONNECTING' || sessionState === 'CONNECTED' || sessionState === 'TRANSFERRING') && incomingManifest && (
+      {(sessionState === 'CONNECTING' || sessionState === 'CONNECTED' || sessionState === 'TRANSFERRING') && incomingManifest && hasAccepted && (
         <div className="space-y-6">
-          {transferProgress && (
+          {transferProgress ? (
             <TransferProgress
               progress={transferProgress}
               onCancel={onCancelTransfer}
               role="receiver"
             />
+          ) : (
+            <div className="bg-white border-2 border-emerald-500 rounded-3xl p-8 text-center shadow-md">
+              <div className="w-14 h-14 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto mb-4 animate-pulse">
+                <Download className="w-7 h-7" />
+              </div>
+              <h3 className="text-xl font-bold text-slate-900 mb-2">Connecting & Receiving...</h3>
+              <p className="text-sm text-slate-500 max-w-sm mx-auto">
+                Opening encrypted direct peer-to-peer data channel. Your download will start automatically in a moment.
+              </p>
+            </div>
           )}
         </div>
       )}

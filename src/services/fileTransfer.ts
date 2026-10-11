@@ -166,6 +166,19 @@ export class FileTransferService {
     const fileChunksMap = new Map<number, Uint8Array[]>();
     const fileBytesReceivedMap = new Map<number, number>();
 
+    onProgress({
+      currentFileIndex: 0,
+      currentFileName: manifest.files[0]?.name || 'Files',
+      currentFileBytesTransferred: 0,
+      currentFileSize: manifest.files[0]?.size || 0,
+      totalFiles: manifest.totalFiles,
+      totalBytesTransferred: 0,
+      totalBytes: manifest.totalBytes,
+      speedBps: 0,
+      etaSeconds: null,
+      status: 'TRANSFERRING',
+    });
+
     let lastMetricsTime = Date.now();
     let lastBytesSample = 0;
     let currentSpeedBps = 0;
