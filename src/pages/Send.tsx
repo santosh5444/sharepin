@@ -39,9 +39,9 @@ export const Send: React.FC<SendProps> = ({
 }) => {
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [copiedPin, setCopiedPin] = useState(false);
-  const [timeLeftSeconds, setTimeLeftSeconds] = useState<number>(120);
+  const [timeLeftSeconds, setTimeLeftSeconds] = useState<number>(180);
 
-  // 2-minute countdown timer logic
+  // 3-minute countdown timer logic
   useEffect(() => {
     if (!expiresAt || sessionState === 'IDLE' || sessionState === 'EXPIRED' || sessionState === 'COMPLETED') {
       return;
@@ -282,7 +282,7 @@ export const Send: React.FC<SendProps> = ({
           </div>
           <h3 className="text-xl font-bold text-slate-900">PIN Expired</h3>
           <p className="text-sm text-slate-600 mt-2 max-w-md mx-auto">
-            The 2-minute joining window for PIN <span className="font-mono font-bold">{pin}</span> has elapsed. Active reservations are automatically cleared.
+            The 3-minute joining window for PIN <span className="font-mono font-bold">{pin}</span> has elapsed. Active reservations are automatically cleared.
           </p>
 
           <div className="mt-6">

@@ -75,7 +75,7 @@ export class PinRegistryDO {
     const sessionId = crypto.randomUUID();
     const senderToken = crypto.randomUUID();
     const now = Date.now();
-    const expiresAt = now + 120 * 1000; // Exact 2-minute joining window
+    const expiresAt = now + 180 * 1000; // Exact 3-minute joining window
 
     const record: PinRecord = {
       pin,
@@ -128,7 +128,7 @@ export class PinRegistryDO {
       return {
         success: false,
         errorCode: 'EXPIRED_PIN',
-        message: 'This PIN has expired (2-minute window has elapsed).',
+        message: 'This PIN has expired (3-minute window has elapsed).',
       };
     }
 

@@ -61,7 +61,7 @@ export const ConnectionStatus: React.FC<ConnectionStatusProps> = ({ state, role 
       return (
         <div className="flex items-center space-x-2 px-3 py-1.5 rounded-full bg-slate-100 border border-slate-300 text-slate-700 text-xs font-medium">
           <Clock className="w-3.5 h-3.5 text-slate-500" />
-          <span>PIN expired (2-minute limit)</span>
+          <span>PIN expired (3-minute limit)</span>
         </div>
       );
 

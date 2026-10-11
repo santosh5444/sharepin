@@ -92,9 +92,9 @@ export const Home: React.FC<HomeProps> = ({ onSelectSend, onSelectReceive }) => 
               <KeyRound className="w-5 h-5" />
             </div>
             <div>
-              <h5 className="text-sm font-bold text-slate-800">2-Minute Temporary PIN</h5>
+              <h5 className="text-sm font-bold text-slate-800">3-Minute Temporary PIN</h5>
               <p className="text-xs text-slate-500 mt-1">
-                PINs expire automatically after 2 minutes. Each PIN is single-use and locked to one receiver.
+                PINs expire automatically after 3 minutes. Each PIN is single-use and locked to one receiver.
               </p>
             </div>
           </div>

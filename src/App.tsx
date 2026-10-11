@@ -317,7 +317,7 @@ export const App: React.FC = () => {
             <strong>SharePin</strong> • Pure Peer-to-Peer File Transfer
           </div>
           <div className="text-slate-400">
-            Encrypted WebRTC • No permanent storage • Temporary 2-min PIN
+            Encrypted WebRTC • No permanent storage • Temporary 3-min PIN
           </div>
         </div>
       </footer>

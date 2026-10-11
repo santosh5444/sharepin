@@ -21,7 +21,7 @@ export interface SessionInfo {
   sessionId: string;
   pin: string;
   createdAt: number;
-  expiresAt: number; // 2 minutes from creation
+  expiresAt: number; // 3 minutes from creation
   state: SessionState;
   role: PeerRole;
 }

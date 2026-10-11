@@ -14,7 +14,7 @@ describe('PinRegistryDO Logic and Security', () => {
     expect(res.expiresAt).toBeGreaterThan(Date.now());
   });
 
-  it('allows a receiver to join with the valid PIN within 2 minutes', () => {
+  it('allows a receiver to join with the valid PIN within 3 minutes', () => {
     const registry = new PinRegistryDO({} as any, {});
     const created = registry.createSession();
 

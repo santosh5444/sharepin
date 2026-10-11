@@ -26,7 +26,7 @@ export interface PinRecord {
   senderToken: string;
   receiverToken?: string;
   createdAt: number;
-  expiresAt: number; // 2 minutes from creation
+  expiresAt: number; // 3 minutes from creation
   isClaimed: boolean;
 }
 

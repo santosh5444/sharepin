@@ -185,7 +185,7 @@ export class SignalingService {
     const pin = (array[0]! % 100000).toString().padStart(5, '0');
     const sessionId = crypto.randomUUID();
     const token = crypto.randomUUID();
-    const expiresAt = Date.now() + 120 * 1000;
+    const expiresAt = Date.now() + 180 * 1000; // 3 minutes
 
     const record: LocalSessionRecord = {
       sessionId,
@@ -229,7 +229,7 @@ export class SignalingService {
         throw new Error('No active session found for this PIN.');
       }
       if (record.expiresAt <= Date.now()) {
-        throw new Error('This PIN has expired (2-minute window has elapsed).');
+        throw new Error('This PIN has expired (3-minute window has elapsed).');
       }
 
       const receiverToken = crypto.randomUUID();
@@ -239,7 +239,7 @@ export class SignalingService {
       return {
         sessionId: record.sessionId,
         token: receiverToken,
-        createdAt: record.expiresAt - 120 * 1000,
+        createdAt: record.expiresAt - 180 * 1000,
         expiresAt: record.expiresAt,
       };
     } catch (err: any) {
