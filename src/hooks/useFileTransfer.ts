@@ -1,7 +1,6 @@
 import { useState, useCallback, useRef } from 'react';
 import { FileTransferService, TransferTransport } from '../services/fileTransfer';
 import { TransferManifest, TransferProgress, FileMetadata, DEFAULT_CHUNK_SIZE } from '../types/transfer';
-import { computeFileSHA256 } from '../utils/fileIntegrity';
 
 export interface CompletedFileItem {
   name: string;
@@ -27,9 +26,6 @@ export function useFileTransfer(transport: TransferTransport | null) {
       totalBytes += f.size;
       const chunkCount = Math.ceil(f.size / DEFAULT_CHUNK_SIZE) || 1;
       
-      // Hash files <= 32MB upfront for integrity; for very large files, verify chunk streaming
-      const sha256 = f.size <= 32 * 1024 * 1024 ? await computeFileSHA256(f) : undefined;
-
       fileMetas.push({
         id: crypto.randomUUID(),
         name: f.name,
@@ -38,7 +34,6 @@ export function useFileTransfer(transport: TransferTransport | null) {
         type: f.type || 'application/octet-stream',
         chunkCount,
         chunkSize: DEFAULT_CHUNK_SIZE,
-        sha256,
         lastModified: f.lastModified,
       });
     }

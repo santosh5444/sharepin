@@ -70,7 +70,7 @@ export class FileTransferService {
    * SENDER: Probes transport with HANDSHAKE_PROBE packets until recipient responds with HANDSHAKE_ACK.
    * Confirms bidirectional connectivity and that recipient message listener is active.
    */
-  private async performHandshake(timeoutMs: number = 2000): Promise<void> {
+  private async performHandshake(timeoutMs: number = 1200): Promise<void> {
     const probe = packChunk(PacketType.HANDSHAKE_PROBE, 0, 0, new Uint8Array(0));
 
     return new Promise((resolve, reject) => {
@@ -106,13 +106,13 @@ export class FileTransferService {
         this.transport.send(probe.buffer as ArrayBuffer);
       } catch {}
 
-      // Retry probe every 200ms in case receiver was still rendering or connecting
+      // Retry probe every 100ms for ultra-fast connection start
       intervalId = setInterval(() => {
         if (isDone || this.isCancelled) return;
         try {
           this.transport.send(probe.buffer as ArrayBuffer);
         } catch {}
-      }, 200);
+      }, 100);
 
       timeoutId = setTimeout(() => {
         cleanup();

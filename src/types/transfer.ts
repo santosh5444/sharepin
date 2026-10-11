@@ -75,9 +75,9 @@ export enum PacketType {
 
 export const HEADER_SIZE = 20;
 
-// Default chunk size is 64 KiB (sweet spot for RTCDataChannel backpressure and latency)
-export const DEFAULT_CHUNK_SIZE = 64 * 1024;
+// Optimal chunk size for modern WebRTC DataChannel & WebSocket edge relay
+export const DEFAULT_CHUNK_SIZE = 128 * 1024; // 128 KiB
 
-// High and low watermarks for WebRTC DataChannel backpressure
-export const BUFFERED_AMOUNT_LOW_THRESHOLD = 256 * 1024; // 256 KiB
-export const BUFFERED_AMOUNT_HIGH_WATERMARK = 1024 * 1024; // 1 MiB
+// High and low watermarks for high-throughput streaming
+export const BUFFERED_AMOUNT_LOW_THRESHOLD = 512 * 1024; // 512 KiB
+export const BUFFERED_AMOUNT_HIGH_WATERMARK = 2 * 1024 * 1024; // 2 MiB

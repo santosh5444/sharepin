@@ -247,11 +247,11 @@ export const App: React.FC = () => {
       const timer = setTimeout(() => {
         const ws = signalingService.getWebSocketTransport();
         if (ws && (activeTransport as any) !== ws) {
-          console.log('WebRTC connection setup exceeded 2s (strict 5G/Symmetric NAT). Engaging Cloudflare Edge Relay.');
+          console.log('WebRTC setup exceeded 800ms (strict 5G NAT). Engaging instant Cloudflare Edge Relay.');
           signalingService.sendMessage('FALLBACK_TO_RELAY', null, role, sessionId);
           fallbackToRelayTransport();
         }
-      }, 2000);
+      }, 800);
       return () => clearTimeout(timer);
     }
   }, [receiverAccepted, activeTransport, signalingService, role, sessionId, fallbackToRelayTransport]);
