@@ -16,7 +16,7 @@ import {
 import { packChunk, unpackPacket } from '../utils/packetProtocol';
 import { computeSHA256 } from '../utils/fileIntegrity';
 import { createFileSink, FileSink } from '../utils/fileSink';
-import { compressChunk, decompressChunk } from '../utils/streamCompression';
+import { compressChunk, decompressChunk, isCompressibleFile } from '../utils/streamCompression';
 import { sanitizeFileName } from '../utils/validation';
 
 export type ProgressCallback = (progress: TransferProgress) => void;
@@ -61,13 +61,13 @@ export class FileTransferService {
         this.transport.addEventListener('bufferedamountlow', handleLow);
       } catch {}
 
-      // Fast 10ms polling watchdog guarantees zero stalling or missed event deadlocks
+      // Fast 4ms polling watchdog guarantees zero stalling or missed event deadlocks
       timer = setInterval(() => {
         if ((this.transport.bufferedAmount || 0) <= BUFFERED_AMOUNT_LOW_THRESHOLD) {
           cleanup();
           resolve();
         }
-      }, 10);
+      }, 4);
     });
   }
 
@@ -194,6 +194,8 @@ export class FileTransferService {
       const file = files[fileIndex]!;
       const totalChunks = Math.ceil(file.size / DEFAULT_CHUNK_SIZE) || 1;
       let fileBytesTransferred = 0;
+      let shouldTryCompress = isCompressibleFile(file.name, file.type);
+      let testedChunks = 0;
 
       // Pipeline: pre-read first chunk
       let nextChunkPromise: Promise<ArrayBuffer> | null =
@@ -212,9 +214,22 @@ export class FileTransferService {
         }
 
         const payload = new Uint8Array(chunkBuffer);
-        const compressed = await compressChunk(payload);
-        const finalPayload = compressed || payload;
-        const flags = compressed ? 0x01 : 0x00;
+        let finalPayload: Uint8Array<ArrayBufferLike> = payload;
+        let flags = 0x00;
+
+        if (shouldTryCompress) {
+          const compressed = await compressChunk(payload);
+          if (compressed) {
+            finalPayload = compressed;
+            flags = 0x01;
+          } else {
+            testedChunks++;
+            // If the first 2 chunks fail to yield compression, skip CPU work for remaining chunks
+            if (testedChunks >= 2) {
+              shouldTryCompress = false;
+            }
+          }
+        }
 
         const packet = packChunk(
           PacketType.FILE_CHUNK,

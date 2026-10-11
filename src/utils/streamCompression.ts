@@ -4,6 +4,30 @@
  * for on-the-fly hardware-accelerated memory compression.
  */
 
+const INCOMPRESSIBLE_EXTENSIONS = new Set([
+  'zip', 'rar', '7z', 'tar', 'gz', 'bz2', 'xz', 'zst', 'tgz',
+  'mp4', 'mkv', 'mov', 'avi', 'wmv', 'flv', 'webm', 'm4v',
+  'mp3', 'aac', 'ogg', 'wav', 'flac', 'm4a', 'wma',
+  'jpg', 'jpeg', 'png', 'gif', 'webp', 'heic', 'heif', 'avif',
+  'pdf', 'dmg', 'iso', 'apk', 'exe', 'msi', 'bin', 'pkg'
+]);
+
+export function isCompressibleFile(filename: string, mimeType?: string): boolean {
+  const ext = filename.split('.').pop()?.toLowerCase() || '';
+  if (INCOMPRESSIBLE_EXTENSIONS.has(ext)) return false;
+  if (mimeType && (
+    mimeType.startsWith('video/') ||
+    mimeType.startsWith('audio/') ||
+    (mimeType.startsWith('image/') && !mimeType.includes('svg')) ||
+    mimeType.includes('zip') ||
+    mimeType.includes('compressed') ||
+    mimeType.includes('pdf')
+  )) {
+    return false;
+  }
+  return true;
+}
+
 export async function compressChunk(data: Uint8Array): Promise<Uint8Array | null> {
   if (typeof CompressionStream === 'undefined') return null;
   try {
