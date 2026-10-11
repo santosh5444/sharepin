@@ -2,6 +2,7 @@ import React from 'react';
 import { TransferProgress as TransferProgressType } from '../types/transfer';
 import { formatBytes, formatSpeed, formatDuration } from '../utils/formatBytes';
 import { ShieldCheck, XOctagon } from 'lucide-react';
+import { SpeedGraph } from './SpeedGraph';
 
 interface TransferProgressProps {
   progress: TransferProgressType;
@@ -14,6 +15,14 @@ export const TransferProgress: React.FC<TransferProgressProps> = ({
   onCancel,
   role,
 }) => {
+  const [speedHistory, setSpeedHistory] = React.useState<number[]>([]);
+
+  React.useEffect(() => {
+    if (progress.status === 'TRANSFERRING' && progress.speedBps > 0) {
+      setSpeedHistory((prev) => [...prev.slice(-24), progress.speedBps]);
+    }
+  }, [progress.speedBps, progress.status]);
+
   const percent = progress.totalBytes > 0
     ? Math.min(100, Math.round((progress.totalBytesTransferred / progress.totalBytes) * 100))
     : 0;
@@ -81,6 +90,14 @@ export const TransferProgress: React.FC<TransferProgressProps> = ({
           </span>
         </div>
       </div>
+
+      {/* Realtime Speed Chart */}
+      {progress.status === 'TRANSFERRING' && (
+        <SpeedGraph
+          speedHistory={speedHistory}
+          currentSpeed={progress.speedBps}
+        />
+      )}
 
       {/* Footer & Controls */}
       <div className="flex items-center justify-between">

@@ -3,9 +3,19 @@ import { FileTransferService } from '../services/fileTransfer';
 import { TransferManifest, TransferProgress, FileMetadata, DEFAULT_CHUNK_SIZE } from '../types/transfer';
 import { computeFileSHA256 } from '../utils/fileIntegrity';
 
+export interface CompletedFileItem {
+  name: string;
+  path?: string;
+  size: number;
+  type: string;
+  blob: Blob;
+  sha256?: string;
+}
+
 export function useFileTransfer(dataChannel: RTCDataChannel | null) {
   const [progress, setProgress] = useState<TransferProgress | undefined>(undefined);
   const [manifest, setManifest] = useState<TransferManifest | null>(null);
+  const [receivedFiles, setReceivedFiles] = useState<CompletedFileItem[]>([]);
   const transferServiceRef = useRef<FileTransferService | null>(null);
 
   const prepareManifest = useCallback(async (files: File[]): Promise<TransferManifest> => {
@@ -67,7 +77,19 @@ export function useFileTransfer(dataChannel: RTCDataChannel | null) {
         setProgress({ ...p });
       },
       (_fileIndex, metadata, blob) => {
-        // Automatically save each received file to user's device
+        // Collect into receivedFiles list for ZIP & inline preview
+        setReceivedFiles((prev) => [
+          ...prev,
+          {
+            name: metadata.name,
+            path: metadata.path,
+            size: metadata.size,
+            type: metadata.type,
+            blob,
+            sha256: metadata.sha256,
+          },
+        ]);
+        // Trigger direct download
         FileTransferService.triggerDownload(blob, metadata.name);
       }
     );
@@ -83,6 +105,7 @@ export function useFileTransfer(dataChannel: RTCDataChannel | null) {
     setProgress,
     manifest,
     setManifest,
+    receivedFiles,
     prepareManifest,
     startSending,
     startReceiving,

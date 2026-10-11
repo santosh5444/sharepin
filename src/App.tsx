@@ -55,6 +55,7 @@ export const App: React.FC = () => {
 
   const {
     progress: transferProgress,
+    receivedFiles,
     prepareManifest,
     startSending,
     startReceiving,
@@ -324,6 +325,7 @@ export const App: React.FC = () => {
             }}
             sessionState={sessionState}
             incomingManifest={incomingManifest}
+            receivedFiles={receivedFiles}
             transferProgress={transferProgress}
             errorMessage={errorMessage}
             onReset={resetAll}
