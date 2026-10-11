@@ -76,8 +76,21 @@ export const Receive: React.FC<ReceiveProps> = ({
   const [previewFile, setPreviewFile] = useState<PreviewableFile | null>(null);
   const [isZipping, setIsZipping] = useState(false);
 
+  const handleJoinWithPin = async (enteredPin: string) => {
+    if (enteredPin.length !== 5 || !onJoinSession || isSubmitting) return;
+    try {
+      setIsSubmitting(true);
+      await onJoinSession(enteredPin);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const handlePinChange = (newPin: string) => {
     setPin(newPin);
+    if (newPin.length === 5) {
+      handleJoinWithPin(newPin);
+    }
   };
 
   const handleAccept = () => {
@@ -87,14 +100,7 @@ export const Receive: React.FC<ReceiveProps> = ({
 
   const handleJoin = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    if (pin.length !== 5 || !onJoinSession) return;
-
-    try {
-      setIsSubmitting(true);
-      await onJoinSession(pin);
-    } finally {
-      setIsSubmitting(false);
-    }
+    handleJoinWithPin(pin);
   };
 
   const handleDownloadAllZip = async () => {
