@@ -56,7 +56,12 @@ export default {
 
     // Health check
     if (url.pathname === '/api/health') {
-      return addCorsHeaders(Response.json({ status: 'healthy', timestamp: Date.now() }));
+      return addCorsHeaders(Response.json({
+        status: 'healthy',
+        timestamp: Date.now(),
+        hasPinRegistry: Boolean(env.PIN_REGISTRY),
+        hasSessionDO: Boolean(env.SESSION_DO),
+      }));
     }
 
     // 1. Create Session
