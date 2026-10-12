@@ -135,18 +135,25 @@ export class PinRegistryDO {
       };
     }
 
-    // Atomic single-receiver check
+    // If already claimed, allow the receiver to reconnect/rejoin with their token
     if (record.isClaimed) {
+      if (!record.receiverToken) {
+        record.receiverToken = crypto.randomUUID();
+      }
       return {
-        success: false,
-        errorCode: 'ALREADY_PAIRED',
-        message: 'This session has already been joined by another device.',
+        success: true,
+        sessionId: record.sessionId,
+        token: record.receiverToken,
+        receiverToken: record.receiverToken,
+        expiresAt: record.expiresAt,
       };
     }
 
     // Claim PIN atomically
     record.isClaimed = true;
-    record.receiverToken = crypto.randomUUID();
+    if (!record.receiverToken) {
+      record.receiverToken = crypto.randomUUID();
+    }
 
     return {
       success: true,
@@ -162,7 +169,14 @@ export class PinRegistryDO {
    */
   public validateToken(sessionId: string, token: string, role: 'sender' | 'receiver'): boolean {
     const pin = this.sessionToPin.get(sessionId);
-    if (!pin) return false;
+    if (!pin) {
+      for (const record of this.activePins.values()) {
+        if (record.sessionId === sessionId) {
+          return role === 'sender' ? record.senderToken === token : record.receiverToken === token;
+        }
+      }
+      return false;
+    }
     const record = this.activePins.get(pin);
     if (!record) return false;
 

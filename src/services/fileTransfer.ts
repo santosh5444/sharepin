@@ -75,7 +75,7 @@ export class FileTransferService {
    * SENDER: Probes transport with HANDSHAKE_PROBE packets until recipient responds with HANDSHAKE_ACK.
    * Confirms bidirectional connectivity and that recipient message listener is active.
    */
-  private async performHandshake(timeoutMs: number = 1200): Promise<void> {
+  private async performHandshake(timeoutMs: number = 15000): Promise<void> {
     const probe = packChunk(PacketType.HANDSHAKE_PROBE, 0, 0, new Uint8Array(0));
 
     return new Promise((resolve, reject) => {
@@ -186,7 +186,7 @@ export class FileTransferService {
     });
 
     // Verify recipient transport is active before streaming chunks
-    await this.performHandshake(2000);
+    await this.performHandshake(15000);
 
     for (let fileIndex = 0; fileIndex < files.length; fileIndex++) {
       if (this.isCancelled) throw new Error('Transfer cancelled by user');

@@ -88,6 +88,7 @@ export const Receive: React.FC<ReceiveProps> = ({
 
   const handleJoinWithPin = async (enteredPin: string) => {
     if (enteredPin.length !== 5 || !onJoinSession || isSubmitting) return;
+    if (sessionState === 'CONNECTING' || sessionState === 'RECEIVER_JOINED' || sessionState === 'CONNECTED' || sessionState === 'TRANSFERRING') return;
     try {
       setIsSubmitting(true);
       await onJoinSession(enteredPin);

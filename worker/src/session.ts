@@ -97,19 +97,23 @@ export class SessionDO {
 
     const handleClose = () => {
       if (role === 'sender') {
-        this.senderWs = null;
-        this.sendToPeer('receiver', {
-          type: 'PEER_DISCONNECTED',
-          senderRole: 'sender',
-          timestamp: Date.now(),
-        });
+        if (this.senderWs === server) {
+          this.senderWs = null;
+          this.sendToPeer('receiver', {
+            type: 'PEER_DISCONNECTED',
+            senderRole: 'sender',
+            timestamp: Date.now(),
+          });
+        }
       } else {
-        this.receiverWs = null;
-        this.sendToPeer('sender', {
-          type: 'PEER_DISCONNECTED',
-          senderRole: 'receiver',
-          timestamp: Date.now(),
-        });
+        if (this.receiverWs === server) {
+          this.receiverWs = null;
+          this.sendToPeer('sender', {
+            type: 'PEER_DISCONNECTED',
+            senderRole: 'receiver',
+            timestamp: Date.now(),
+          });
+        }
       }
     };
 
