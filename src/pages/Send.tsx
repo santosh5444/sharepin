@@ -60,6 +60,13 @@ export const Send: React.FC<SendProps> = ({
     return () => clearInterval(interval);
   }, [expiresAt, sessionState]);
 
+  // Auto-close QR modal when receiver scans and joins
+  useEffect(() => {
+    if (sessionState === 'RECEIVER_JOINED' || sessionState === 'TRANSFERRING' || sessionState === 'CONNECTING') {
+      setShowQrModal(false);
+    }
+  }, [sessionState]);
+
   const handleFilesSelected = (newFiles: File[]) => {
     setSelectedFiles((prev) => [...prev, ...newFiles]);
   };
@@ -223,19 +230,19 @@ export const Send: React.FC<SendProps> = ({
 
       {/* Step 3: Receiver Joined - Sender Approval Step */}
       {sessionState === 'RECEIVER_JOINED' && (
-        <div className="bg-white border-2 border-brand-500 rounded-3xl p-6 sm:p-8 shadow-md text-center">
-          <div className="w-14 h-14 rounded-2xl bg-brand-50 text-brand-600 flex items-center justify-center mx-auto mb-4">
-            <UserCheck className="w-7 h-7" />
+        <div className="bg-white border-2 border-brand-500 rounded-3xl p-6 sm:p-8 shadow-xl text-center animate-in zoom-in-95 duration-200">
+          <div className="w-16 h-16 rounded-2xl bg-brand-50 text-brand-600 flex items-center justify-center mx-auto mb-4">
+            <UserCheck className="w-8 h-8 text-brand-600 animate-bounce" />
           </div>
 
-          <h3 className="text-xl font-bold text-slate-900">
-            Recipient is ready!
+          <h3 className="text-2xl font-black text-slate-900">
+            🎉 Recipient is ready!
           </h3>
           <p className="text-sm text-slate-600 mt-2 max-w-md mx-auto">
-            A receiver entered PIN <span className="font-mono font-bold text-brand-700">{pin}</span> and requested to receive:
+            Recipient paired with PIN <span className="font-mono font-bold text-brand-700 bg-brand-50 px-2 py-0.5 rounded border border-brand-200">{pin}</span> and requested to receive:
           </p>
 
-          <div className="my-5 p-4 rounded-2xl bg-slate-50 border border-slate-200 text-sm font-semibold text-slate-800 max-w-sm mx-auto">
+          <div className="my-5 p-4 rounded-2xl bg-slate-50 border border-slate-200 text-sm font-semibold text-slate-800 max-w-sm mx-auto shadow-inner">
             {selectedFiles.length} {selectedFiles.length === 1 ? 'file' : 'files'} • {formatBytes(totalBytes)}
           </div>
 
@@ -243,14 +250,14 @@ export const Send: React.FC<SendProps> = ({
             <button
               type="button"
               onClick={onApproveTransfer}
-              className="px-6 py-3 rounded-xl bg-brand-600 hover:bg-brand-500 active:scale-95 text-white font-bold text-sm shadow-md shadow-brand-600/20 transition"
+              className="px-8 py-3.5 rounded-2xl bg-brand-600 hover:bg-brand-500 active:scale-95 text-white font-extrabold text-base shadow-lg shadow-brand-600/30 transition animate-pulse"
             >
               Approve & Send
             </button>
             <button
               type="button"
               onClick={onRejectTransfer}
-              className="px-5 py-3 rounded-xl bg-slate-100 hover:bg-slate-200 active:scale-95 text-slate-700 font-semibold text-sm transition"
+              className="px-5 py-3.5 rounded-2xl bg-slate-100 hover:bg-slate-200 active:scale-95 text-slate-700 font-semibold text-sm transition"
             >
               Decline
             </button>

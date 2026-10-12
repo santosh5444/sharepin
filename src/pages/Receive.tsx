@@ -13,11 +13,11 @@ import { FileTransferService } from '../services/fileTransfer';
 import {
   Download,
   Check,
+  CheckCircle2,
   ShieldCheck,
   ArrowLeft,
   RotateCcw,
   FileBox,
-  Loader2,
   Archive,
   Eye,
   FileImage,
@@ -34,6 +34,7 @@ interface ReceiveProps {
   onDeclineTransfer?: () => void;
   onCancelTransfer?: () => void;
   sessionState?: SessionState;
+  pin?: string;
   incomingManifest?: TransferManifest | null;
   receivedFiles?: CompletedFileItem[];
   transferProgress?: TransferProgressType;
@@ -65,6 +66,7 @@ export const Receive: React.FC<ReceiveProps> = ({
   onDeclineTransfer,
   onCancelTransfer,
   sessionState = 'IDLE',
+  pin: propPin = '',
   incomingManifest = null,
   receivedFiles = [],
   transferProgress,
@@ -72,11 +74,17 @@ export const Receive: React.FC<ReceiveProps> = ({
   onReset,
   isDirectP2P,
 }) => {
-  const [pin, setPin] = useState('');
+  const [pin, setPin] = useState(propPin);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasAccepted, setHasAccepted] = useState(false);
   const [previewFile, setPreviewFile] = useState<PreviewableFile | null>(null);
   const [isZipping, setIsZipping] = useState(false);
+
+  React.useEffect(() => {
+    if (propPin) {
+      setPin(propPin);
+    }
+  }, [propPin]);
 
   const handleJoinWithPin = async (enteredPin: string) => {
     if (enteredPin.length !== 5 || !onJoinSession || isSubmitting) return;
@@ -184,15 +192,23 @@ export const Receive: React.FC<ReceiveProps> = ({
 
       {/* Step 2: Waiting for Sender Approval */}
       {(sessionState === 'CONNECTING' || sessionState === 'RECEIVER_JOINED') && !incomingManifest && (
-        <div className="bg-white border border-slate-200 rounded-3xl p-8 sm:p-10 shadow-sm text-center">
-          <div className="w-16 h-16 rounded-2xl bg-brand-50 text-brand-600 flex items-center justify-center mx-auto mb-4 animate-pulse">
-            <Loader2 className="w-8 h-8 animate-spin" />
+        <div className="bg-white border border-slate-200 rounded-3xl p-8 sm:p-10 shadow-sm text-center animate-in fade-in duration-200">
+          <div className="w-16 h-16 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto mb-4">
+            <CheckCircle2 className="w-9 h-9 text-emerald-600 animate-in zoom-in-75 duration-200" />
           </div>
-          <h3 className="text-xl font-bold text-slate-900">
+
+          {(pin || propPin) && (
+            <div className="inline-flex items-center space-x-2 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold px-3.5 py-1.5 rounded-full mb-3">
+              <Check className="w-3.5 h-3.5 text-emerald-600" />
+              <span>Paired with PIN <strong className="font-mono tracking-wider">{pin || propPin}</strong></span>
+            </div>
+          )}
+
+          <h3 className="text-xl sm:text-2xl font-black text-slate-900">
             Connected to Sender!
           </h3>
-          <p className="text-sm text-slate-600 mt-2 max-w-md mx-auto">
-            Please approve the transfer on the sender's device. Once the sender approves, you will be able to review and download the incoming files.
+          <p className="text-sm text-slate-600 mt-2 max-w-md mx-auto leading-relaxed">
+            Your device is paired. Please tap <strong className="text-slate-900 font-bold">"Approve & Send"</strong> on the sender's device to begin the transfer.
           </p>
           <div className="mt-6 inline-flex items-center space-x-2 text-xs font-semibold text-brand-700 bg-brand-50 px-4 py-2 rounded-full border border-brand-200">
             <span className="w-2 h-2 rounded-full bg-brand-600 animate-ping" />

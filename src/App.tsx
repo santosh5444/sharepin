@@ -103,6 +103,7 @@ export const App: React.FC = () => {
           case 'RECIPIENT_READY' as any:
             setSessionState('RECEIVER_JOINED');
             if (peerRole === 'sender') {
+              try { playSuccessChime(); } catch {}
               // Pre-warm WebRTC connection early in background while awaiting sender approval
               initConnection();
               startOffer().catch(() => {});
@@ -393,6 +394,7 @@ export const App: React.FC = () => {
               resetAll();
             }}
             sessionState={sessionState}
+            pin={pin}
             incomingManifest={incomingManifest}
             receivedFiles={receivedFiles}
             transferProgress={transferProgress}
