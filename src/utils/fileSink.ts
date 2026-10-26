@@ -29,9 +29,9 @@ export async function createFileSink(
       const handle = await root.getFileHandle(tempId, { create: true });
       const writable = await handle.createWritable();
 
-      // Batch buffered writes: buffer up to 2 MiB in memory before writing to OPFS
-      // Reduces 6,000+ disk I/O calls down to ~400, eliminating flash storage IPC bottlenecks
-      const WRITE_BATCH_SIZE = 2 * 1024 * 1024; // 2 MiB
+      // Batch buffered writes: buffer up to 4 MiB in memory before writing to OPFS
+      // Reduces 6,000+ disk I/O calls down to ~200, eliminating flash storage IPC bottlenecks
+      const WRITE_BATCH_SIZE = 4 * 1024 * 1024; // 4 MiB
       let writeBuffer: Uint8Array[] = [];
       let bufferedBytes = 0;
 

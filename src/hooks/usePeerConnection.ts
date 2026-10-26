@@ -15,24 +15,35 @@ export function usePeerConnection(options: UsePeerConnectionOptions) {
   const [connectionState, setConnectionState] = useState<RTCPeerConnectionState>('new');
   const peerServiceRef = useRef<PeerConnectionService | null>(null);
   const pendingCandidatesRef = useRef<RTCIceCandidateInit[]>([]);
+  const offerInitiatedRef = useRef(false);
 
   const optionsRef = useRef(options);
   optionsRef.current = options;
 
-  const initConnection = useCallback(() => {
+  const roleRef = useRef<PeerRole>(options.role);
+  const sessionIdRef = useRef<string>(options.sessionId);
+
+  if (options.role) roleRef.current = options.role;
+  if (options.sessionId) sessionIdRef.current = options.sessionId;
+
+  const initConnection = useCallback((explicitRole?: PeerRole, explicitSessionId?: string) => {
+    if (explicitRole) roleRef.current = explicitRole;
+    if (explicitSessionId) sessionIdRef.current = explicitSessionId;
+
     if (peerServiceRef.current) {
       return peerServiceRef.current;
     }
 
-    const isInitiator = optionsRef.current.role === 'sender';
+    const currentRole = explicitRole || roleRef.current;
+    const isInitiator = currentRole === 'sender';
 
     const pc = new PeerConnectionService({
       onIceCandidate: (candidate) => {
         optionsRef.current.signalingService.sendMessage(
           'ICE_CANDIDATE',
           candidate.toJSON(),
-          optionsRef.current.role,
-          optionsRef.current.sessionId
+          roleRef.current,
+          sessionIdRef.current
         );
       },
       onConnectionStateChange: (state) => {
@@ -65,8 +76,8 @@ export function usePeerConnection(options: UsePeerConnectionOptions) {
     optionsRef.current.signalingService.sendMessage(
       'ANSWER',
       answer,
-      optionsRef.current.role,
-      optionsRef.current.sessionId
+      roleRef.current,
+      sessionIdRef.current
     );
   }, []);
 
@@ -83,11 +94,9 @@ export function usePeerConnection(options: UsePeerConnectionOptions) {
     await peerServiceRef.current.addIceCandidate(candidate);
   }, []);
 
-  const offerInitiatedRef = useRef(false);
-
-  const startOffer = useCallback(async () => {
+  const startOffer = useCallback(async (force = false) => {
     if (!peerServiceRef.current) return;
-    if (offerInitiatedRef.current) {
+    if (offerInitiatedRef.current && !force) {
       return;
     }
     offerInitiatedRef.current = true;
@@ -96,8 +105,8 @@ export function usePeerConnection(options: UsePeerConnectionOptions) {
       optionsRef.current.signalingService.sendMessage(
         'OFFER',
         offer,
-        optionsRef.current.role,
-        optionsRef.current.sessionId
+        roleRef.current,
+        sessionIdRef.current
       );
     } catch (err) {
       offerInitiatedRef.current = false;

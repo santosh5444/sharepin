@@ -17,6 +17,7 @@ import {
   ShieldCheck,
   ArrowLeft,
   RotateCcw,
+  Clock,
   FileBox,
   Archive,
   Eye,
@@ -148,7 +149,7 @@ export const Receive: React.FC<ReceiveProps> = ({
       )}
 
       {/* Step 1: PIN Input */}
-      {sessionState === 'IDLE' && (
+      {(sessionState === 'IDLE' || sessionState === 'FAILED') && !incomingManifest && (
         <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-10 shadow-sm text-center">
           <div className="w-14 h-14 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto mb-4">
             <Download className="w-7 h-7" />
@@ -191,8 +192,30 @@ export const Receive: React.FC<ReceiveProps> = ({
         </div>
       )}
 
+      {/* Step 1.5: Connecting In Progress */}
+      {sessionState === 'CONNECTING' && !incomingManifest && (
+        <div className="bg-white border border-slate-200 rounded-3xl p-8 sm:p-10 shadow-sm text-center animate-in fade-in duration-200">
+          <div className="w-16 h-16 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto mb-4 animate-pulse">
+            <Clock className="w-8 h-8 text-emerald-600 animate-spin" />
+          </div>
+
+          {(pin || propPin) && (
+            <div className="inline-flex items-center space-x-2 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold px-3.5 py-1.5 rounded-full mb-3">
+              <span>Connecting with PIN <strong className="font-mono tracking-wider">{pin || propPin}</strong></span>
+            </div>
+          )}
+
+          <h3 className="text-xl sm:text-2xl font-black text-slate-900">
+            Connecting to Sender...
+          </h3>
+          <p className="text-sm text-slate-600 mt-2 max-w-md mx-auto leading-relaxed">
+            Verifying 5-digit PIN and establishing real-time peer session.
+          </p>
+        </div>
+      )}
+
       {/* Step 2: Waiting for Sender Approval */}
-      {(sessionState === 'CONNECTING' || sessionState === 'RECEIVER_JOINED') && !incomingManifest && (
+      {sessionState === 'RECEIVER_JOINED' && !incomingManifest && (
         <div className="bg-white border border-slate-200 rounded-3xl p-8 sm:p-10 shadow-sm text-center animate-in fade-in duration-200">
           <div className="w-16 h-16 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto mb-4">
             <CheckCircle2 className="w-9 h-9 text-emerald-600 animate-in zoom-in-75 duration-200" />

@@ -76,7 +76,7 @@ export class PinRegistryDO {
     const sessionId = crypto.randomUUID();
     const senderToken = crypto.randomUUID();
     const now = Date.now();
-    const expiresAt = now + 180 * 1000; // Exact 3-minute joining window
+    const expiresAt = now + 300 * 1000; // Generous 5-minute joining window
 
     const record: PinRecord = {
       pin,

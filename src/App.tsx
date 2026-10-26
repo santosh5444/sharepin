@@ -17,6 +17,8 @@ export const App: React.FC = () => {
   const [activeTransport, setActiveTransport] = useState<RTCDataChannel | WebSocket | null>(null);
   const [incomingManifest, setIncomingManifest] = useState<TransferManifest | null>(null);
   const [receiverAccepted, setReceiverAccepted] = useState(false);
+  const [scannedPin, setScannedPin] = useState<string>('');
+  const scannedPinProcessed = useRef(false);
 
   const {
     sessionState,
@@ -52,7 +54,8 @@ export const App: React.FC = () => {
       const ws = signalingService.getWebSocketTransport();
       if (ws) {
         console.warn('WebRTC failed, falling back to instant WebSocket relay:', err.message);
-        setActiveTransport(ws);
+        signalingService.sendMessage('FALLBACK_TO_RELAY', null, role, sessionId);
+        fallbackToRelayTransport();
       } else {
         setSessionState('FAILED');
         setErrorMessage(`Connection Error: ${err.message}`);
@@ -105,16 +108,16 @@ export const App: React.FC = () => {
             if (peerRole === 'sender') {
               try { playSuccessChime(); } catch {}
               // Pre-warm WebRTC connection early in background while awaiting sender approval
-              initConnection();
+              initConnection('sender', sId);
               startOffer().catch(() => {});
             } else {
-              initConnection();
+              initConnection('receiver', sId);
             }
             break;
 
           case 'OFFER':
             if (peerRole === 'receiver') {
-              initConnection();
+              initConnection('receiver', sId);
               await handleOffer(msg.payload);
             }
             break;
@@ -133,7 +136,7 @@ export const App: React.FC = () => {
             if (peerRole === 'receiver') {
               setIncomingManifest(msg.payload.manifest);
               setSessionState('RECEIVER_JOINED');
-              initConnection();
+              initConnection('receiver', sId);
             }
             break;
 
@@ -211,7 +214,7 @@ export const App: React.FC = () => {
   const handleApproveTransfer = async () => {
     try {
       setSessionState('CONNECTING');
-      initConnection();
+      initConnection('sender', sessionId);
 
       // Send manifest preview to receiver
       const manifest = await prepareManifest(selectedFiles);
@@ -224,7 +227,7 @@ export const App: React.FC = () => {
 
       // Initiate WebRTC Offer if not already established
       if (!activeTransport || (activeTransport instanceof RTCDataChannel && activeTransport.readyState !== 'open')) {
-        await startOffer();
+        await startOffer(true);
       }
     } catch (err: any) {
       setSessionState('FAILED');
@@ -246,18 +249,18 @@ export const App: React.FC = () => {
   };
 
   // Synchronized NAT Traversal / 5G Fallback timer:
-  // Give direct WebRTC STUN NAT punch-through 5.0 seconds across cellular/Wi-Fi carriers
-  // before switching peers to high-throughput Cloudflare edge WebSocket relay.
+  // Fast 2.5-second failover ensures instant streaming across strict symmetric cellular/Wi-Fi NATs
+  // before seamlessly engaging ultra-fast Cloudflare edge WebSocket relay.
   useEffect(() => {
     if (receiverAccepted && (!activeTransport || (activeTransport instanceof RTCDataChannel && activeTransport.readyState !== 'open'))) {
       const timer = setTimeout(() => {
         const ws = signalingService.getWebSocketTransport();
         if (ws && (activeTransport as any) !== ws) {
-          console.log('WebRTC connection not open within 5.0s (likely symmetric NAT). Engaging Cloudflare Edge Relay.');
+          console.log('WebRTC connection not open within 2.5s (likely symmetric NAT). Engaging Cloudflare Edge Relay.');
           signalingService.sendMessage('FALLBACK_TO_RELAY', null, role, sessionId);
           fallbackToRelayTransport();
         }
-      }, 5000);
+      }, 2500);
       return () => clearTimeout(timer);
     }
   }, [receiverAccepted, activeTransport, signalingService, role, sessionId, fallbackToRelayTransport]);
@@ -331,11 +334,16 @@ export const App: React.FC = () => {
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const pinParam = urlParams.get('pin');
-    if (pinParam && /^[0-9]{5}$/.test(pinParam)) {
+    if (pinParam && /^[0-9]{5}$/.test(pinParam) && !scannedPinProcessed.current) {
+      scannedPinProcessed.current = true;
+      setScannedPin(pinParam);
       setCurrentView('receive');
       handleJoinSession(pinParam);
-      // Clean up URL without reload
-      window.history.replaceState({}, '', window.location.pathname);
+      setTimeout(() => {
+        try {
+          window.history.replaceState({}, '', window.location.pathname);
+        } catch {}
+      }, 1500);
     }
   }, []);
 
@@ -394,7 +402,7 @@ export const App: React.FC = () => {
               resetAll();
             }}
             sessionState={sessionState}
-            pin={pin}
+            pin={pin || scannedPin}
             incomingManifest={incomingManifest}
             receivedFiles={receivedFiles}
             transferProgress={transferProgress}

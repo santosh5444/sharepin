@@ -158,11 +158,21 @@ export class SignalingService {
       };
 
       this.ws.onerror = (_ev) => {
-        console.warn('WebSocket error, falling back to local BroadcastChannel coordinator');
-        this.connectLocalBroadcast(sessionId, role, callbacks);
+        console.warn('Signaling WebSocket error event');
+        const isLocalHost = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+        if (isLocalHost && (this.httpBaseUrl.includes('localhost') || this.httpBaseUrl.includes('127.0.0.1'))) {
+          this.connectLocalBroadcast(sessionId, role, callbacks);
+        } else {
+          callbacks.onError?.(_ev);
+        }
       };
-    } catch {
-      this.connectLocalBroadcast(sessionId, role, callbacks);
+    } catch (err: any) {
+      const isLocalHost = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+      if (isLocalHost) {
+        this.connectLocalBroadcast(sessionId, role, callbacks);
+      } else {
+        callbacks.onError?.(err instanceof Error ? err : new Error(String(err)));
+      }
     }
   }
 

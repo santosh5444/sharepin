@@ -78,7 +78,7 @@ export const HEADER_SIZE = 20;
 // Turbo 256 KiB chunk size: maximum throughput for modern WebRTC DataChannels & WebSocket relays
 export const DEFAULT_CHUNK_SIZE = 256 * 1024; // 256 KiB
 
-// Ultra-smooth continuous pacing thresholds (4 MiB flight window with tight 1 MiB drain gap)
-// Prevents burst-and-stall freezes, delivering silky-smooth uninterrupted streaming
-export const BUFFERED_AMOUNT_LOW_THRESHOLD = 3 * 1024 * 1024; // 3 MiB
-export const BUFFERED_AMOUNT_HIGH_WATERMARK = 4 * 1024 * 1024; // 4 MiB
+// Ultra-smooth continuous pacing thresholds (8 MiB flight window with tight 2 MiB drain gap)
+// Delivers continuous peak gigabit speeds over fast Wi-Fi and 5G connections without stalls
+export const BUFFERED_AMOUNT_LOW_THRESHOLD = 6 * 1024 * 1024; // 6 MiB
+export const BUFFERED_AMOUNT_HIGH_WATERMARK = 8 * 1024 * 1024; // 8 MiB
