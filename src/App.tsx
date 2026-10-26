@@ -216,7 +216,7 @@ export const App: React.FC = () => {
       setSessionState('CONNECTING');
       initConnection('sender', sessionId);
 
-      // Send manifest preview to receiver
+      // Send manifest preview to receiver via WebSocket and Durable Object backup
       const manifest = await prepareManifest(selectedFiles);
       signalingService.sendMessage(
         'SENDER_APPROVAL_REQUEST',
@@ -224,6 +224,7 @@ export const App: React.FC = () => {
         'sender',
         sessionId
       );
+      signalingService.publishManifest(sessionId, manifest);
 
       // Initiate WebRTC Offer if not already established
       if (!activeTransport || (activeTransport instanceof RTCDataChannel && activeTransport.readyState !== 'open')) {
@@ -246,7 +247,55 @@ export const App: React.FC = () => {
     setReceiverAccepted(true);
     setSessionState('CONNECTING');
     signalingService.sendMessage('SENDER_APPROVED', null, 'receiver', sessionId);
+    signalingService.publishAccept(sessionId);
   };
+
+  // Dual-Homed Backup Sync: Sender polls session state while awaiting receiver
+  useEffect(() => {
+    if (sessionState === 'WAITING_FOR_RECEIVER' && sessionId) {
+      const pollTimer = setInterval(async () => {
+        const status = await signalingService.pollSessionStatus(sessionId);
+        if (status.isClaimed && sessionState === 'WAITING_FOR_RECEIVER') {
+          console.log('[Dual-Home Sync] Detected recipient joined session via Cloudflare DO poll!');
+          setSessionState('RECEIVER_JOINED');
+          try { playSuccessChime(); } catch {}
+          initConnection('sender', sessionId);
+          startOffer().catch(() => {});
+        }
+      }, 1000);
+      return () => clearInterval(pollTimer);
+    }
+  }, [sessionState, sessionId, signalingService, initConnection, startOffer]);
+
+  // Dual-Homed Backup Sync: Receiver polls for manifest approval
+  useEffect(() => {
+    if ((sessionState === 'RECEIVER_JOINED' || sessionState === 'CONNECTING') && sessionId && !incomingManifest) {
+      const pollTimer = setInterval(async () => {
+        const status = await signalingService.pollSessionStatus(sessionId);
+        if (status.manifest && !incomingManifest) {
+          console.log('[Dual-Home Sync] Detected incoming manifest via Cloudflare DO poll!');
+          setIncomingManifest(status.manifest);
+          setSessionState('RECEIVER_JOINED');
+          initConnection('receiver', sessionId);
+        }
+      }, 1000);
+      return () => clearInterval(pollTimer);
+    }
+  }, [sessionState, sessionId, incomingManifest, signalingService, initConnection]);
+
+  // Dual-Homed Backup Sync: Sender polls for receiver acceptance
+  useEffect(() => {
+    if (sessionState === 'CONNECTING' && sessionId && !receiverAccepted && role === 'sender') {
+      const pollTimer = setInterval(async () => {
+        const status = await signalingService.pollSessionStatus(sessionId);
+        if (status.receiverAccepted && !receiverAccepted) {
+          console.log('[Dual-Home Sync] Detected recipient accepted transfer via Cloudflare DO poll!');
+          setReceiverAccepted(true);
+        }
+      }, 1000);
+      return () => clearInterval(pollTimer);
+    }
+  }, [sessionState, sessionId, receiverAccepted, role, signalingService]);
 
   // Synchronized NAT Traversal / 5G Fallback timer:
   // Fast 2.5-second failover ensures instant streaming across strict symmetric cellular/Wi-Fi NATs

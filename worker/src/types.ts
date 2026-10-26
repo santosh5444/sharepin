@@ -26,8 +26,10 @@ export interface PinRecord {
   senderToken: string;
   receiverToken?: string;
   createdAt: number;
-  expiresAt: number; // 3 minutes from creation
+  expiresAt: number;
   isClaimed: boolean;
+  manifest?: any;
+  receiverAccepted?: boolean;
 }
 
 export type SignalingType =

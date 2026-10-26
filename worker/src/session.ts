@@ -11,7 +11,8 @@ export class SessionDO {
   async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
 
-    if (request.headers.get('Upgrade') !== 'websocket') {
+    const upgradeHeader = request.headers.get('Upgrade');
+    if (!upgradeHeader || upgradeHeader.toLowerCase() !== 'websocket') {
       return new Response('Expected WebSocket upgrade', { status: 426 });
     }
 

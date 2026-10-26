@@ -1,11 +1,47 @@
 import { PinRecord } from './types';
 
 export class PinRegistryDO {
+  private state?: DurableObjectState;
   private activePins = new Map<string, PinRecord>(); // pin -> record
   private sessionToPin = new Map<string, string>();   // sessionId -> pin
+  private initialized = false;
 
-  constructor(_state: DurableObjectState, _env: any) {
-    // In-memory or persisted state
+  constructor(state?: DurableObjectState, _env?: any) {
+    this.state = state;
+  }
+
+  private async ensureInitialized(): Promise<void> {
+    if (this.initialized) return;
+    if (this.state && this.state.storage) {
+      try {
+        const stored = await this.state.storage.list<PinRecord>({ prefix: 'pin:' });
+        for (const [, record] of stored) {
+          if (record && record.pin) {
+            this.activePins.set(record.pin, record);
+            this.sessionToPin.set(record.sessionId, record.pin);
+          }
+        }
+      } catch (err) {
+        console.warn('Failed to load sessions from storage:', err);
+      }
+    }
+    this.initialized = true;
+  }
+
+  private persistRecord(record: PinRecord): void {
+    if (this.state && this.state.storage) {
+      this.state.storage.put(`pin:${record.pin}`, record).catch(err => {
+        console.warn('Failed to persist record:', err);
+      });
+    }
+  }
+
+  private deleteRecord(pin: string): void {
+    if (this.state && this.state.storage) {
+      this.state.storage.delete(`pin:${pin}`).catch(err => {
+        console.warn('Failed to delete record:', err);
+      });
+    }
   }
 
   /**
@@ -50,6 +86,7 @@ export class PinRegistryDO {
       if (record.expiresAt <= now && !record.isClaimed) {
         this.activePins.delete(pin);
         this.sessionToPin.delete(record.sessionId);
+        this.deleteRecord(pin);
       }
     }
   }
@@ -89,6 +126,7 @@ export class PinRegistryDO {
 
     this.activePins.set(pin, record);
     this.sessionToPin.set(sessionId, pin);
+    this.persistRecord(record);
 
     return {
       success: true,
@@ -128,6 +166,7 @@ export class PinRegistryDO {
     if (record.expiresAt <= now) {
       this.activePins.delete(pin);
       this.sessionToPin.delete(record.sessionId);
+      this.deleteRecord(pin);
       return {
         success: false,
         errorCode: 'EXPIRED_PIN',
@@ -140,6 +179,7 @@ export class PinRegistryDO {
       if (!record.receiverToken) {
         record.receiverToken = crypto.randomUUID();
       }
+      this.persistRecord(record);
       return {
         success: true,
         sessionId: record.sessionId,
@@ -154,6 +194,7 @@ export class PinRegistryDO {
     if (!record.receiverToken) {
       record.receiverToken = crypto.randomUUID();
     }
+    this.persistRecord(record);
 
     return {
       success: true,
@@ -188,6 +229,77 @@ export class PinRegistryDO {
   }
 
   /**
+   * Gets session state and synchronization payload
+   */
+  public getStatus(sessionId: string): {
+    found: boolean;
+    isClaimed?: boolean;
+    manifest?: any;
+    receiverAccepted?: boolean;
+    expiresAt?: number;
+  } {
+    const pin = this.sessionToPin.get(sessionId);
+    let record = pin ? this.activePins.get(pin) : undefined;
+    if (!record) {
+      for (const r of this.activePins.values()) {
+        if (r.sessionId === sessionId) {
+          record = r;
+          break;
+        }
+      }
+    }
+    if (!record) return { found: false };
+
+    return {
+      found: true,
+      isClaimed: record.isClaimed,
+      manifest: record.manifest,
+      receiverAccepted: record.receiverAccepted,
+      expiresAt: record.expiresAt,
+    };
+  }
+
+  /**
+   * Sender sets manifest
+   */
+  public setManifest(sessionId: string, manifest: any): boolean {
+    const pin = this.sessionToPin.get(sessionId);
+    let record = pin ? this.activePins.get(pin) : undefined;
+    if (!record) {
+      for (const r of this.activePins.values()) {
+        if (r.sessionId === sessionId) {
+          record = r;
+          break;
+        }
+      }
+    }
+    if (!record) return false;
+    record.manifest = manifest;
+    this.persistRecord(record);
+    return true;
+  }
+
+  /**
+   * Receiver accepts transfer
+   */
+  public setAccepted(sessionId: string): boolean {
+    const pin = this.sessionToPin.get(sessionId);
+    let record = pin ? this.activePins.get(pin) : undefined;
+    if (!record) {
+      for (const r of this.activePins.values()) {
+        if (r.sessionId === sessionId) {
+          record = r;
+          break;
+        }
+      }
+    }
+    if (!record) return false;
+    record.receiverAccepted = true;
+    this.persistRecord(record);
+    return true;
+  }
+
+  /**
    * Releases a session and its PIN reservation
    */
   public releaseSession(sessionId: string): void {
@@ -195,10 +307,12 @@ export class PinRegistryDO {
     if (pin) {
       this.activePins.delete(pin);
       this.sessionToPin.delete(sessionId);
+      this.deleteRecord(pin);
     }
   }
 
   async fetch(request: Request): Promise<Response> {
+    await this.ensureInitialized();
     const url = new URL(request.url);
     const path = url.pathname;
 
@@ -223,6 +337,24 @@ export class PinRegistryDO {
       const body = await request.json() as { sessionId: string; token: string; role: 'sender' | 'receiver' };
       const valid = this.validateToken(body.sessionId, body.token, body.role);
       return Response.json({ valid });
+    }
+
+    if (path === '/status') {
+      const sessionId = url.searchParams.get('sessionId') || '';
+      const status = this.getStatus(sessionId);
+      return Response.json(status);
+    }
+
+    if (path === '/manifest') {
+      const body = await request.json() as { sessionId: string; manifest: any };
+      const ok = this.setManifest(body.sessionId, body.manifest);
+      return Response.json({ success: ok });
+    }
+
+    if (path === '/accept') {
+      const body = await request.json() as { sessionId: string };
+      const ok = this.setAccepted(body.sessionId);
+      return Response.json({ success: ok });
     }
 
     return new Response('Not found', { status: 404 });

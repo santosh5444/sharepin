@@ -109,6 +109,45 @@ export class SignalingService {
     }
   }
 
+  public async pollSessionStatus(sessionId: string): Promise<{
+    found: boolean;
+    isClaimed?: boolean;
+    manifest?: any;
+    receiverAccepted?: boolean;
+  }> {
+    try {
+      const res = await fetch(`${this.httpBaseUrl}/api/sessions/status?sessionId=${encodeURIComponent(sessionId)}`);
+      if (res.ok) {
+        return await res.json();
+      }
+    } catch {}
+    return { found: false };
+  }
+
+  public async publishManifest(sessionId: string, manifest: any): Promise<boolean> {
+    try {
+      const res = await fetch(`${this.httpBaseUrl}/api/sessions/manifest`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId, manifest }),
+      });
+      return res.ok;
+    } catch {}
+    return false;
+  }
+
+  public async publishAccept(sessionId: string): Promise<boolean> {
+    try {
+      const res = await fetch(`${this.httpBaseUrl}/api/sessions/accept`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId }),
+      });
+      return res.ok;
+    } catch {}
+    return false;
+  }
+
   public connectWebSocket(
     sessionId: string,
     token: string,

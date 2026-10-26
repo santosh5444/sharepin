@@ -65,7 +65,7 @@ export default {
     }
 
     // 1. Create Session
-    if (url.pathname === '/api/sessions' && request.method === 'POST') {
+    if ((url.pathname === '/api/sessions' || url.pathname === '/api/sessions/create') && request.method === 'POST') {
       if (!createLimiter.isAllowed(clientIp)) {
         return addCorsHeaders(
           Response.json(
@@ -129,6 +129,54 @@ export default {
       } else {
         const res = getLocalRegistry().joinSession(pin);
         return addCorsHeaders(Response.json(res));
+      }
+    }
+
+    // 2.1 Session State Poll (Infallible Fallback Synchronization)
+    if (url.pathname === '/api/sessions/status' && request.method === 'GET') {
+      const sessionId = url.searchParams.get('sessionId') || '';
+      if (env.PIN_REGISTRY) {
+        const id = env.PIN_REGISTRY.idFromName('global-pin-registry');
+        const stub = env.PIN_REGISTRY.get(id);
+        const res = await stub.fetch(`http://registry/status?sessionId=${encodeURIComponent(sessionId)}`);
+        return addCorsHeaders(res);
+      } else {
+        const res = getLocalRegistry().getStatus(sessionId);
+        return addCorsHeaders(Response.json(res));
+      }
+    }
+
+    // 2.2 Sender Sets Manifest (Infallible Approval)
+    if (url.pathname === '/api/sessions/manifest' && request.method === 'POST') {
+      const body = await request.json() as { sessionId: string; manifest: any };
+      if (env.PIN_REGISTRY) {
+        const id = env.PIN_REGISTRY.idFromName('global-pin-registry');
+        const stub = env.PIN_REGISTRY.get(id);
+        const res = await stub.fetch('http://registry/manifest', {
+          method: 'POST',
+          body: JSON.stringify(body),
+        });
+        return addCorsHeaders(res);
+      } else {
+        const ok = getLocalRegistry().setManifest(body.sessionId, body.manifest);
+        return addCorsHeaders(Response.json({ success: ok }));
+      }
+    }
+
+    // 2.3 Receiver Accepts Transfer (Infallible Acceptance)
+    if (url.pathname === '/api/sessions/accept' && request.method === 'POST') {
+      const body = await request.json() as { sessionId: string };
+      if (env.PIN_REGISTRY) {
+        const id = env.PIN_REGISTRY.idFromName('global-pin-registry');
+        const stub = env.PIN_REGISTRY.get(id);
+        const res = await stub.fetch('http://registry/accept', {
+          method: 'POST',
+          body: JSON.stringify(body),
+        });
+        return addCorsHeaders(res);
+      } else {
+        const ok = getLocalRegistry().setAccepted(body.sessionId);
+        return addCorsHeaders(Response.json({ success: ok }));
       }
     }
 
